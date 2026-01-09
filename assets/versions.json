@@ -9,6 +9,9 @@
 		"1.0.2": [
 			"Added privacy policy and TOS page icons.",
 			"Added main favicon."
+		],
+		"1.0.3": [
+			"Extended tab bar width on all pages."
 		]
 	}
 }

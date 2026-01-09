@@ -9,7 +9,9 @@
 
 		<title>JFSC — Privacy Policy</title>
 
-		<link rel="icon" href="../../assets/icons/privacypolicy.png" sizes="any">
+		<!-- <link rel="icon" href="../../assets/icons/privacy.ico" sizes="any"> -->
+		<link rel="icon" type="image/png" href="../../assets/icons/privacypolicy.png" sizes="512x512">
+		<link rel="apple-touch-icon" href="../../assets/icons/privacypolicy.png">
 		<link rel="stylesheet" href="../../assets/site.css">
 	</head>
 
@@ -161,7 +163,7 @@
 				<code class="inline" id="versionCode">v—</code>
 			</div>
 
-			<div class="tabsBar">
+			<div class="tabsBar" style="width: 100%;">
 				<nav class="tabs">
 					<a class="tabBtn" data-tab="home" href="../../"><span class="tabDot"></span> Home</a>
 					<a class="tabBtn" data-tab="about" href="../about/"><span class="tabDot"></span> About</a>
@@ -180,7 +182,7 @@
 
 			initAppSettings()
 			startOrbBackgroundFromSettings({ spawnEveryMs: 1500, sizeMin: 340, sizeMax: 760 })
-			autoMarkActiveTab("about") // not a tab, but keeps dots consistent with JSTC behavior if you do it
+			autoMarkActiveTab()
 
 			document.getElementById("versionCode").textContent = `v${JSTC_VERSION}`
 

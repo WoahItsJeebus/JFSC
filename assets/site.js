@@ -10,7 +10,7 @@
 
 
 let __orbBgStop = null;
-export const JSTC_VERSION = "1.0.2";
+export const JSTC_VERSION = "1.0.3";
 
 export function startOrbBackground(opts = {}) {
 	const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
@@ -785,11 +785,11 @@ export function autoMarkActiveTab(pageKey) {
 		// tolerate both "/pages/about/" and "/about/" structures
 		if (p.includes("/settings/")) return "settings";
 		if (p.includes("/about/")) return "about";
-		return "home";
+		if (p.includes("/home/")) return "home";
+		return null;	
 	}
 
-	const key = String(pageKey || inferKeyFromPath()).toLowerCase();
-
+	const key = String(pageKey || inferKeyFromPath() || "").toLowerCase();
 	document.querySelectorAll(".tabs .tabBtn").forEach((a) => {
 		const k = (a.getAttribute("data-tab") || "").toLowerCase();
 		a.classList.toggle("active", k === key);

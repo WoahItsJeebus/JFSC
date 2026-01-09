@@ -3,10 +3,6 @@ import { JFSC_OAUTH, JFSC_NET } from "./config.js"
 
 const TOKENS_KEY = "JFSC_OAUTH_TOKENS_v1"
 
-function normBase(s) {
-	return String(s || "").replace(/\/+$/, "")
-}
-
 function isLikelyCorsError(e) {
 	const msg = String(e?.message || e || "")
 	// In browsers, CORS blocks commonly show up as TypeError + “Failed to fetch”

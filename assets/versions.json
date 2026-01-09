@@ -5,6 +5,10 @@
 		],
 		"1.0.1": [
 			"Added privacy policy and TOS page links to about page."
+		],
+		"1.0.2": [
+			"Added privacy policy and TOS page icons.",
+			"Added main favicon."
 		]
 	}
 }

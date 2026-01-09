@@ -111,6 +111,26 @@ button:active{ transform:translateY(1px); }
   .card.span2{ grid-column: 1 / -1; }
 }
 
+.btn{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+}
+
+.btnIcon{
+  width:18px;
+  height:18px;
+  opacity:.9;
+  flex:0 0 auto;
+  background-size:contain;
+  background-repeat:no-repeat;
+  background-position:center;
+  transform: translateY(-.5px);
+}
+
+.bgLock{ background-image:url("https://cdn-icons-png.freepik.com/512/8336/8336773.png"); }
+.bgFile{ background-image:url("https://cdn-icons-png.freepik.com/512/8336/8336773.png"); }
+
 .card{
 	border:1px solid var(--border);
 	border-radius:16px;

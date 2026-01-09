@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+		<meta name="theme-color" content="#0b0f17">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<title>JFSC — OAuth Callback</title>
+
+		<link rel="icon" href="../../favicon.ico" sizes="any">
+		<link rel="stylesheet" href="../../assets/site.css">
+	</head>
+
+	<body>
+		<div class="wrap">
+			<header>
+				<div>
+					<h1>Signing you in…</h1>
+					<div class="sub">Completing Roblox OAuth and returning you to JFSC.</div>
+				</div>
+			</header>
+
+			<section class="card">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>OAuth Callback</div>
+				</div>
+
+				<div class="body">
+					<div class="mono" id="status">Working…</div>
+					<div class="mono muted" id="detail" style="margin-top:10px;"></div>
+
+					<div id="errorBox" style="display:none; margin-top:14px;">
+						<div class="pill warn">Something went wrong</div>
+						<div class="mono" id="errorMsg" style="margin-top:10px; white-space:pre-wrap;"></div>
+						<div style="margin-top:14px;">
+							<a class="btn" href="../../">Back to JFSC</a>
+						</div>
+					</div>
+				</div>
+			</section>
+		</div>
+
+		<script type="module">
+			import { startOrbBackground } from "../../assets/site.js";
+
+			startOrbBackground();
+
+			const TOKENS_KEY = "JFSC_OAUTH_TOKENS_v1";
+			const PENDING_KEY = "JFSC_OAUTH_PENDING_v1";
+
+			const statusEl = document.getElementById("status");
+			const detailEl = document.getElementById("detail");
+			const errorBox = document.getElementById("errorBox");
+			const errorMsg = document.getElementById("errorMsg");
+
+			function showError(msg) {
+				statusEl.textContent = "Failed.";
+				detailEl.textContent = "";
+				errorMsg.textContent = String(msg || "Unknown error.");
+				errorBox.style.display = "";
+			}
+
+			function safeJsonParse(str) {
+				try { return JSON.parse(str); } catch { return null; }
+			}
+
+			function setStatus(line1, line2 = "") {
+				statusEl.textContent = line1;
+				detailEl.textContent = line2;
+			}
+
+			async function exchangeCodeForTokens({ code, codeVerifier, clientId, redirectUri }) {
+				const body = new URLSearchParams();
+				body.set("grant_type", "authorization_code");
+				body.set("client_id", clientId);
+				body.set("code", code);
+				body.set("code_verifier", codeVerifier);
+				body.set("redirect_uri", redirectUri);
+
+				const res = await fetch("https://apis.roblox.com/oauth/v1/token", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/x-www-form-urlencoded"
+					},
+					body
+				});
+
+				const text = await res.text();
+				let data = null;
+				try { data = JSON.parse(text); } catch {}
+
+				if (!res.ok) {
+					const detail = data?.error_description || data?.error || text || `HTTP ${res.status}`;
+					throw new Error(`Token exchange failed: ${detail}`);
+				}
+
+				if (!data?.access_token) {
+					throw new Error("Token exchange succeeded but access_token was missing.");
+				}
+
+				const expiresIn = Number(data.expires_in || 0);
+				const now = Date.now();
+
+				return {
+					version: 1,
+					obtainedAtMs: now,
+					expiresAtMs: now + Math.max(0, expiresIn * 1000) - 15000, // 15s safety buffer
+					tokenType: data.token_type || "Bearer",
+					scope: data.scope || "",
+					accessToken: data.access_token,
+					refreshToken: data.refresh_token || "",
+					idToken: data.id_token || ""
+				};
+			}
+
+			(function main() {
+				const url = new URL(location.href);
+				const q = url.searchParams;
+
+				if (q.get("error")) {
+					const e = q.get("error");
+					const desc = q.get("error_description") || "";
+					showError(`${e}${desc ? `\n${desc}` : ""}`);
+					return;
+				}
+
+				const code = q.get("code");
+				const state = q.get("state");
+				if (!code || !state) {
+					showError("Missing code/state in callback URL.");
+					return;
+				}
+
+				const pending = safeJsonParse(localStorage.getItem(PENDING_KEY) || "");
+				if (!pending || !pending.state || !pending.codeVerifier || !pending.clientId || !pending.redirectUri) {
+					showError("No pending OAuth request found. Start sign-in again from JFSC.");
+					return;
+				}
+
+				if (pending.state !== state) {
+					showError("State mismatch. Start sign-in again from JFSC.");
+					return;
+				}
+
+				setStatus("Exchanging code for tokens…", "Talking to apis.roblox.com/oauth/v1/token");
+
+				exchangeCodeForTokens({
+					code,
+					codeVerifier: pending.codeVerifier,
+					clientId: pending.clientId,
+					redirectUri: pending.redirectUri
+				})
+					.then((tokens) => {
+						localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
+						localStorage.removeItem(PENDING_KEY);
+
+						setStatus("Signed in.", "Redirecting back to JFSC…");
+
+						// Root landing page
+						location.replace("../../?signedIn=1");
+					})
+					.catch((err) => {
+						showError(err?.message || String(err));
+					});
+			})();
+		</script>
+	</body>
+</html>

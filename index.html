@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+		<meta name="theme-color" content="#0b0f17">
+
+		<!-- iOS Add-to-Home-Screen / standalone -->
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<title>JFSC — Jeebus’ Friends Since Checker</title>
+
+		<link rel="icon" href="./favicon.ico" sizes="any">
+		<link rel="stylesheet" href="./assets/site.css">
+	</head>
+	<body>
+		<div class="wrap">
+			<header>
+				<div>
+					<h1>JFSC — Friends Since Checker</h1>
+					<div class="sub">
+						This tool tracks “friends since” from the first time <em>JFSC</em> sees a connection.
+						Older friends will show <code class="inline">Not yet recorded</code> until you set a date manually.
+					</div>
+				</div>
+
+				<!-- Toolbar: scrolls on narrow screens + fades only when overflow exists -->
+				<div class="toolbar hScroll fadeScroll" id="toolbarScroll">
+					<div class="pill" id="statusPill">Status: Not connected</div>
+					<div class="pill" id="storagePill">Storage: Local</div>
+					<div class="pill" id="tzPill">Local TZ: —</div>
+				</div>
+			</header>
+
+			<div class="grid">
+				<section class="card">
+					<div class="head">
+						<div class="title"><span class="statusDot off" id="authDot"></span>Roblox Connection</div>
+						<div class="tag" id="authTag">DISCONNECTED</div>
+					</div>
+
+					<div style="padding:14px;">
+						<div class="footer" style="margin-top:0;">
+							To read your friends list, you’ll authorize JFSC via Roblox OAuth.
+							This does <em>not</em> require cookies or any sketchy stuff.
+						</div>
+
+						<div class="toolbar" style="justify-content:flex-start; margin-top:12px;">
+							<button id="connectBtn" type="button" style="padding:10px 12px; font-weight:800;">
+								Connect Roblox
+							</button>
+
+							<button id="demoBtn" type="button" class="smallBtn" title="Loads fake data locally (no OAuth).">
+								Demo
+							</button>
+						</div>
+
+						<div class="footer">
+							When OAuth is wired, this button will redirect to Roblox, then return to
+							<code class="inline">/pages/callback/</code>.
+						</div>
+					</div>
+				</section>
+
+				<section class="card">
+					<div class="head">
+						<div class="title"><span class="statusDot off" id="friendsDot"></span>Tracked Friends</div>
+						<div class="tag" id="friendsTag">0</div>
+					</div>
+
+					<div class="fadeWrap fadeScroll" id="friendsFade">
+						<div class="tableScroll" id="friendsScroll">
+							<table>
+								<thead>
+									<tr>
+										<th style="width:52%">Friend</th>
+										<th style="width:24%">Friends Since</th>
+										<th style="width:24%">Duration</th>
+									</tr>
+								</thead>
+								<tbody id="friendsBody">
+									<tr>
+										<td colspan="3" class="muted">
+											Not connected yet. Hit <span class="mono">Connect Roblox</span> (or Demo) to populate this list.
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</section>
+			</div>
+
+			<div class="footer">
+				<code class="inline" id="versionCode">v—</code>
+			</div>
+
+			<div class="tabsBar">
+				<nav class="tabs">
+					<a class="tabBtn active" data-tab="home" href="./"><span class="tabDot"></span> Home</a>
+					<a class="tabBtn" data-tab="about" href="./pages/about/"><span class="tabDot"></span> About</a>
+					<a class="tabBtn" data-tab="settings" href="./pages/settings/"><span class="tabDot"></span> Settings</a>
+				</nav>
+			</div>
+		</div>
+
+		<script type="module">
+			import {
+				attachFadeToScroller,
+				autoMarkActiveTab,
+				initAppSettings,
+				startOrbBackgroundFromSettings,
+				JSTC_VERSION
+			} from "./assets/site.js"
+
+			import { startOAuthLogin } from "./assets/oauth.js"
+			import { fetchUserInfo, fetchAllFriends, fetchAvatarHeadshots, hasAccessToken, clearStoredTokens } from "./assets/api.js"
+			import { loadDb, ensureOwner, syncFriends, formatLocalDateTime, formatDurationSince } from "./assets/db.js"
+
+			const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local"
+			document.getElementById("tzPill").textContent = `Local TZ: ${tz}`
+			document.getElementById("versionCode").textContent = `v${JSTC_VERSION}`
+
+			initAppSettings()
+			startOrbBackgroundFromSettings({ spawnEveryMs: 1600, sizeMin: 340, sizeMax: 720 })
+			autoMarkActiveTab("home")
+
+			attachFadeToScroller(
+				document.getElementById("toolbarScroll"),
+				document.getElementById("toolbarScroll")
+			)
+
+			attachFadeToScroller(
+				document.getElementById("friendsScroll"),
+				document.getElementById("friendsFade")
+			)
+
+			const el = {
+				authDot: document.getElementById("authDot"),
+				authTag: document.getElementById("authTag"),
+				statusPill: document.getElementById("statusPill"),
+				friendsDot: document.getElementById("friendsDot"),
+				friendsTag: document.getElementById("friendsTag"),
+				friendsBody: document.getElementById("friendsBody"),
+				connectBtn: document.getElementById("connectBtn"),
+				demoBtn: document.getElementById("demoBtn"),
+			}
+
+			function setAuthUi(connected, label = "") {
+				el.authTag.textContent = connected ? "CONNECTED" : "DISCONNECTED"
+				el.statusPill.textContent = connected ? `Status: Connected${label ? ` (${label})` : ""}` : "Status: Not connected"
+
+				el.authDot.classList.toggle("off", !connected)
+				el.authDot.style.background = connected ? "var(--good)" : "var(--bad)"
+			}
+
+			function setFriendsUi(count, connected) {
+				el.friendsTag.textContent = String(count ?? 0)
+				el.friendsDot.classList.toggle("off", !connected)
+				el.friendsDot.style.background = connected ? "var(--good)" : "rgba(255,255,255,.55)"
+			}
+
+			function escapeHtml(s) {
+				return String(s)
+					.replace(/&/g, "&amp;")
+					.replace(/</g, "&lt;")
+					.replace(/>/g, "&gt;")
+					.replace(/"/g, "&quot;")
+					.replace(/'/g, "&#039;")
+			}
+
+			function chunk(arr, size) {
+				const out = []
+				for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+				return out
+			}
+
+			function renderPlaceholder(text) {
+				el.friendsBody.innerHTML = `
+					<tr>
+						<td colspan="3" class="muted">${escapeHtml(text)}</td>
+					</tr>
+				`
+			}
+
+			function renderFriendsTable(friends, headshotMap, db) {
+				const now = Date.now()
+
+				const rows = friends.map((f) => {
+					const rec = db.friends[String(f.id)] || null
+					const friendsSinceMs = rec?.friendsSinceMs ?? null
+					const source = rec?.source ?? "not_recorded"
+
+					return {
+						id: f.id,
+						name: f.name || "",
+						displayName: f.displayName || "",
+						img: headshotMap.get(f.id) || "",
+						friendsSinceMs,
+						source,
+					}
+				})
+
+				rows.sort((a, b) => {
+					const ar = a.friendsSinceMs ? 0 : 1
+					const br = b.friendsSinceMs ? 0 : 1
+					if (ar !== br) return ar - br
+
+					if (a.friendsSinceMs && b.friendsSinceMs) return a.friendsSinceMs - b.friendsSinceMs
+					return (a.displayName || a.name).localeCompare(b.displayName || b.name)
+				})
+
+				el.friendsBody.innerHTML = rows.map((r) => {
+					const title = r.displayName || r.name || `User ${r.id}`
+					const sub = r.displayName && r.name && r.displayName !== r.name ? r.name : ""
+					const sinceText = r.friendsSinceMs ? formatLocalDateTime(r.friendsSinceMs) : "Not yet recorded"
+					const durText = formatDurationSince(r.friendsSinceMs, { now })
+
+					const badge = r.source === "manual"
+						? `<span class="tag" style="margin-left:8px;">MANUAL</span>`
+						: r.friendsSinceMs
+							? `<span class="tag" style="margin-left:8px;">OBSERVED</span>`
+							: `<span class="tag" style="margin-left:8px;">LEGACY</span>`
+
+					const img = r.img
+						? `<img src="${escapeHtml(r.img)}" alt="" style="width:28px;height:28px;border-radius:999px;vertical-align:middle;margin-right:10px;box-shadow:0 0 0 1px rgba(255,255,255,.12);">`
+						: `<span style="display:inline-block;width:28px;height:28px;border-radius:999px;vertical-align:middle;margin-right:10px;background:rgba(255,255,255,.06);box-shadow:0 0 0 1px rgba(255,255,255,.10);"></span>`
+
+					return `
+						<tr>
+							<td>
+								${img}
+								<span style="font-weight:800;">${escapeHtml(title)}</span>
+								${badge}
+								${sub ? `<div class="muted mono" style="margin-top:2px;">@${escapeHtml(sub)}</div>` : ""}
+							</td>
+							<td class="mono">${escapeHtml(sinceText)}</td>
+							<td class="mono">${escapeHtml(durText)}</td>
+						</tr>
+					`
+				}).join("")
+			}
+
+			async function refreshFriends() {
+				if (!hasAccessToken()) {
+					setAuthUi(false)
+					setFriendsUi(0, false)
+					renderPlaceholder("Not connected yet. Hit Connect Roblox to populate this list.")
+					return
+				}
+
+				setAuthUi(true, "Loading")
+				setFriendsUi(0, true)
+				renderPlaceholder("Loading user…")
+
+				let user
+				try {
+					user = await fetchUserInfo()
+				}
+				catch (e) {
+					setAuthUi(false, "Auth error")
+					setFriendsUi(0, false)
+					renderPlaceholder("Failed to load user info. Try reconnecting.")
+					console.error(e)
+					return
+				}
+
+				const userId = Number(user?.sub || 0)
+				if (!Number.isFinite(userId) || userId <= 0) {
+					setAuthUi(false, "Bad user")
+					setFriendsUi(0, false)
+					renderPlaceholder("OAuth userinfo did not include a valid user id.")
+					return
+				}
+
+				renderPlaceholder("Loading friends list…")
+
+				let friends = []
+				try {
+					friends = await fetchAllFriends(userId, { pageLimit: 100, hardCap: 5000 })
+				}
+				catch (e) {
+					setFriendsUi(0, false)
+					renderPlaceholder("Failed to fetch friends list (rate limit or endpoint error).")
+					console.error(e)
+					return
+				}
+
+				setFriendsUi(friends.length, true)
+
+				const ids = friends.map((f) => f.id)
+				const headshotMap = new Map()
+
+				renderPlaceholder("Loading thumbnails…")
+
+				// Headshots: chunk to avoid URL size / server limits
+				for (const part of chunk(ids, 100)) {
+					try {
+						const m = await fetchAvatarHeadshots(part, { size: "48x48", isCircular: true })
+						for (const [k, v] of m.entries()) headshotMap.set(k, v)
+					}
+					catch (e) {
+						// Non-fatal
+						console.warn("Headshot fetch chunk failed:", e)
+					}
+				}
+
+				let db = loadDb()
+				db = ensureOwner(db, userId)
+
+				// Baseline capture happens automatically on first sync
+				syncFriends(db, ids)
+
+				setAuthUi(true, "Ready")
+				renderFriendsTable(friends, headshotMap, db)
+
+				// Clean URL params like ?signedIn=1
+				if (location.search) {
+					history.replaceState({}, "", location.pathname)
+				}
+			}
+
+			el.connectBtn?.addEventListener("click", async () => {
+				try {
+					await startOAuthLogin()
+				}
+				catch (e) {
+					console.error(e)
+				}
+			})
+
+			// Demo stays stubbed for now
+			el.demoBtn?.addEventListener("click", () => {
+				alert("Demo mode next. (No OAuth, fake friends list.)")
+			})
+
+			// Auto-refresh on load if token exists
+			refreshFriends()
+
+			// Optional: easy dev sign-out from console:
+			// clearStoredTokens(); location.reload();
+			window.JFSC_DEV = {
+				signOut() {
+					clearStoredTokens()
+					location.reload()
+				}
+			}
+		</script>
+
+	</body>
+</html>

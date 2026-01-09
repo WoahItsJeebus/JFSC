@@ -12,6 +12,9 @@
 		],
 		"1.0.3": [
 			"Extended tab bar width on all pages."
+		],
+		"1.0.4": [
+			"Fixed toolbar fade effect on home page."
 		]
 	}
 }

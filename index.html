@@ -26,10 +26,12 @@
 				</div>
 
 				<!-- Toolbar: scrolls on narrow screens + fades only when overflow exists -->
-				<div class="toolbar hScroll fadeScroll" id="toolbarScroll">
-					<div class="pill" id="statusPill">Status: Not connected</div>
-					<div class="pill" id="storagePill">Storage: Local</div>
-					<div class="pill" id="tzPill">Local TZ: —</div>
+				<div class="fadeWrap fadeScroll" id="toolbarFade">
+					<div class="toolbar hScroll" id="toolbarScroll">
+						<div class="pill" id="statusPill">Status: Not connected</div>
+						<div class="pill" id="storagePill">Storage: Local</div>
+						<div class="pill" id="tzPill">Local TZ: —</div>
+					</div>
 				</div>
 			</header>
 
@@ -128,7 +130,7 @@
 
 			attachFadeToScroller(
 				document.getElementById("toolbarScroll"),
-				document.getElementById("toolbarScroll")
+				document.getElementById("toolbarFade")
 			)
 
 			attachFadeToScroller(

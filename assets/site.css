@@ -325,6 +325,22 @@ a.platformLink:active{
   min-width: 480px;
 }
 
+/* Toolbar fade wrapper needs to clip its ::before/::after */
+#toolbarFade{
+  overflow:hidden;
+  border-radius: 999px; /* matches your pill style */
+  max-width: 100%;
+  
+  background: rgba(0,0,0,.10);
+  border: 1px solid var(--border);
+  padding: 2px;
+}
+
+/* Flexbox gotcha: allow the fadeWrap to shrink inside header */
+header > #toolbarFade{
+  min-width: 0;
+}
+
 /* Fades: only visible when .isScrollable is present.
    Left fade hidden when atStart, right fade hidden when atEnd. */
 .fadeScroll::before,
@@ -378,7 +394,8 @@ a.platformLink:active{
   width:26px;
   pointer-events:none;
   opacity:0;
-  transition: opacity 160ms ease;
+  transition: opacity 240ms ease-out;
+  
   z-index: 3;
 }
 

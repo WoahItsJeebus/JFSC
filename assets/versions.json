@@ -28,6 +28,9 @@
 		],
 		"1.0.8": [
 			"Fixed friends list retrieval logic to use correct function. Pulling username and display name from user object."
+		],
+		"1.0.9": [
+			"Removed unused normBase function from API module."
 		]
 	}
 }

@@ -34,6 +34,9 @@
 		],
 		"1.0.10": [
 			"Fixed friends list retrieval logic to use correct function."
+		],
+		"1.0.11": [
+			"Adjusted layout of home page cards to span two columns for better visibility."
 		]
 	}
 }

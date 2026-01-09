@@ -10,7 +10,7 @@
 
 
 let __orbBgStop = null;
-export const JSTC_VERSION = "1.0.0";
+export const JSTC_VERSION = "1.0.1";
 
 export function startOrbBackground(opts = {}) {
 	const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;

@@ -39,6 +39,7 @@
 						</div>
 					</div>
 				</section>
+
 				<section class="card span2">
 					<div class="head">
 						<div class="title"><span class="statusDot warn"></span>Known Bugs</div>
@@ -51,7 +52,6 @@
 									<tr>
 										<th style="width:24%">Status</th>
 										<th>Bug</th>
-										<!-- <th style="width:18%">Info</th> -->
 										<th>Info</th>
 									</tr>
 								</thead>
@@ -60,6 +60,7 @@
 						</div>
 					</div>
 				</section>
+
 				<section class="card span2">
 					<div class="head">
 						<div class="title"><span class="statusDot"></span>Credits & Platforms</div>
@@ -71,14 +72,34 @@
 						</div>
 					</div>
 				</section>
+
+				<!-- NEW: Legal -->
+				<section class="card span2">
+					<div class="head">
+						<div class="title"><span class="statusDot"></span>Legal</div>
+						<div class="tag">POLICY</div>
+					</div>
+					<div style="padding:14px;">
+						<div class="footer" style="margin-top:0;">
+							These pages exist to support publishing the Roblox OAuth app. They’re not hidden, just not in the main tabs.
+						</div>
+
+						<div class="toolbar" style="justify-content:flex-start; margin-top:12px; gap:10px; flex-wrap:wrap;">
+							<a class="btn" href="../privacypolicy/">Privacy Policy</a>
+							<a class="btn" href="../tos/">Terms of Service</a>
+						</div>
+
+						<div class="footer" style="margin-top:10px;">
+							You can always return using the tabs bar at the bottom.
+						</div>
+					</div>
+				</section>
 			</div>
-			<!-- Footer -->
-			<!-- <div class="cornerRefresh">
-				<button style="background:rgba(15, 21, 32, 0.98);" id="hardRefreshBtn" type="button" title="Refresh">↻</button>
-			</div> -->
+
 			<div class="footer">
 				<code class="inline" id="versionCode">v—</code>
 			</div>
+
 			<div class="tabsBar">
 				<nav class="tabs">
 					<a class="tabBtn" data-tab="home" href="../../"><span class="tabDot"></span> Home</a>
@@ -87,6 +108,7 @@
 				</nav>
 			</div>
 		</div>
+
 		<script type="module">
 			import {
 			  renderPlatformLinks,
@@ -313,6 +335,10 @@
 			const platformLinks = [
 			  { label: "GitHub", url: "https://github.com/WoahItsJeebus" },
 			  { label: "Roblox", url: "https://www.roblox.com/users/3817884/profile" },
+
+			  // Optional: also include legal links in the scrolling link row
+			  { label: "Privacy Policy", url: "../privacypolicy/" },
+			  { label: "Terms of Service", url: "../tos/" },
 			];
 			renderPlatformLinks(platformLinks, "platformLinks");
 			attachFadeScroll(document.getElementById("platformLinks"));
@@ -334,6 +360,6 @@
 		"status": "wontfix",		-- (wontfix || open || investigating || fixed)
 		"bug": "",					-- (string) — Description of the bug
 		"note": "",					-- (string) — Side notes
-		"fixedin": "",				-- (string) — Version number — (fixed status only)
+		"fixedIn": "",				-- (string) — Version number — (fixed status only)
 	}
-	-->
+-->

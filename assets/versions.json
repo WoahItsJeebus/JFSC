@@ -22,6 +22,9 @@
 		],
 		"1.0.6": [
 			"Updated CORS proxy URL in API config & handler to use a fallback."
+		],
+		"1.0.7": [
+			"Fixed home page failing to load properly."
 		]
 	}
 }

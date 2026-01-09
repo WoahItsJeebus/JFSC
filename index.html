@@ -112,10 +112,7 @@
 				JSTC_VERSION
 			} from "./assets/site.js"
 
-			import { startOAuthLogin } from "./assets/oauth.js"
-			import { fetchUserInfo, fetchAllFriends, fetchAvatarHeadshots, hasAccessToken, clearStoredTokens } from "./assets/api.js"
-			import { loadDb, ensureOwner, syncFriends, formatLocalDateTime, formatDurationSince } from "./assets/db.js"
-
+			// Always-run boot (won’t brick if api/db/oauth are broken)
 			const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local"
 			document.getElementById("tzPill").textContent = `Local TZ: ${tz}`
 			document.getElementById("versionCode").textContent = `v${JSTC_VERSION}`
@@ -147,7 +144,7 @@
 				connectBtn: document.getElementById("connectBtn"),
 				disconnectBtn: document.getElementById("disconnectBtn"),
 			}
-			
+
 			function setStatus(text){
 				el.statusPill.textContent = `Status: ${text}`
 			}
@@ -155,16 +152,17 @@
 			function setDotState(dotEl, state){
 				// state: "ok" | "loading" | "error" | "off"
 				dotEl.classList.remove("warn", "bad", "off")
-
 				if (state === "loading") dotEl.classList.add("warn")
 				else if (state === "error") dotEl.classList.add("bad")
 				else if (state === "off") dotEl.classList.add("off")
-				// "ok" = base .statusDot styling
 			}
 
 			function setAuthUi(connected, state){
 				el.authTag.textContent = connected ? "CONNECTED" : "DISCONNECTED"
 				setDotState(el.authDot, connected ? state : "off")
+				el.authHint.textContent = connected
+					? "Connected. You can reconnect if something stops working, or disconnect to clear local tokens."
+					: "Not connected. Click Connect Roblox to begin."
 			}
 
 			function setFriendsUi(count, state){
@@ -172,11 +170,7 @@
 				setDotState(el.friendsDot, state)
 			}
 
-			function updateConnectButtonLabel(){
-				el.connectBtn.textContent = hasAccessToken() ? "Reconnect Roblox" : "Connect Roblox"
-			}
-
-			function escapeHtml(s) {
+			function escapeHtml(s){
 				return String(s)
 					.replace(/&/g, "&amp;")
 					.replace(/</g, "&lt;")
@@ -185,13 +179,7 @@
 					.replace(/'/g, "&#039;")
 			}
 
-			function chunk(arr, size) {
-				const out = []
-				for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
-				return out
-			}
-
-			function renderPlaceholder(text) {
+			function renderPlaceholder(text){
 				el.friendsBody.innerHTML = `
 					<tr>
 						<td colspan="3" class="muted">${escapeHtml(text)}</td>
@@ -199,46 +187,54 @@
 				`
 			}
 
-			function setConnectedButtons(connected) {
-				el.connectBtn.textContent = connected ? "Reconnect Roblox" : "Connect Roblox"
-				el.disconnectBtn.style.display = connected ? "" : "none"
+			function chunk(arr, size){
+				const out = []
+				for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+				return out
 			}
 
-			function setAuthUi(connected, label = "") {
-				el.authTag.textContent = connected ? "CONNECTED" : "DISCONNECTED"
-				el.statusPill.textContent = connected
-					? `Status: Connected${label ? ` (${label})` : ""}`
-					: "Status: Not connected"
+			// Load the rest only if those modules are valid
+			let startOAuthLogin, api, db
 
-				el.authDot.classList.toggle("off", !connected)
-				el.authDot.style.background = connected ? "var(--good)" : "var(--bad)"
-
-				el.authHint.textContent = connected
-					? "Connected. You can reconnect if something stops working, or disconnect to clear local tokens."
-					: "Not connected. Click Connect Roblox to begin."
-
-				setConnectedButtons(connected)
+			try {
+				({ startOAuthLogin } = await import("./assets/oauth.js"))
+				api = await import("./assets/api.js")
+				db = await import("./assets/db.js")
+			} catch (e) {
+				console.error(e)
+				setStatus("Boot failed")
+				setAuthUi(false, "error")
+				setFriendsUi(0, "off")
+				renderPlaceholder(`App boot failed. Open console for details.`)
+				throw e
 			}
 
-			function setFriendsUi(count, connected) {
-				el.friendsTag.textContent = String(count ?? 0)
-				el.friendsDot.classList.toggle("off", !connected)
-				el.friendsDot.style.background = connected ? "var(--good)" : "rgba(255,255,255,.55)"
+			const {
+				fetchUserInfo,
+				fetchAllFriends,
+				fetchAvatarHeadshots,
+				hasAccessToken,
+				clearStoredTokens,
+			} = api
+
+			const {
+				loadDb,
+				ensureOwner,
+				syncFriends,
+				formatLocalDateTime,
+				formatDurationSince,
+			} = db
+
+			function updateConnectButtonLabel(){
+				el.connectBtn.textContent = hasAccessToken() ? "Reconnect Roblox" : "Connect Roblox"
+				el.disconnectBtn.style.display = hasAccessToken() ? "" : "none"
 			}
 
-			function describeFetchError(e) {
-				const status = e?.status ?? e?.code ?? null
-				if (status === 429) return "Rate limited by Roblox (HTTP 429). Try again in a bit."
-				if (status === 401 || status === 403) return `Authorization failed (HTTP ${status}). Try reconnecting.`
-				if (status) return `Endpoint error (HTTP ${status}).`
-				return "Rate limited or endpoint error."
-			}
-
-			function renderFriendsTable(friends, headshotMap, db) {
+			function renderFriendsTable(friends, headshotMap, dbState){
 				const now = Date.now()
 
 				const rows = friends.map((f) => {
-					const rec = db.friends[String(f.id)] || null
+					const rec = dbState.friends[String(f.id)] || null
 					const friendsSinceMs = rec?.friendsSinceMs ?? null
 					const source = rec?.source ?? "not_recorded"
 
@@ -256,14 +252,12 @@
 					const ar = a.friendsSinceMs ? 0 : 1
 					const br = b.friendsSinceMs ? 0 : 1
 					if (ar !== br) return ar - br
-
 					if (a.friendsSinceMs && b.friendsSinceMs) return a.friendsSinceMs - b.friendsSinceMs
 					return (a.displayName || a.name).localeCompare(b.displayName || b.name)
 				})
 
 				el.friendsBody.innerHTML = rows.map((r) => {
 					const title = r.displayName || r.name || `User ${r.id}`
-					const sub = r.displayName && r.name && r.displayName !== r.name ? r.name : ""
 					const sinceText = r.friendsSinceMs ? formatLocalDateTime(r.friendsSinceMs) : "Not yet recorded"
 					const durText = formatDurationSince(r.friendsSinceMs, { now })
 
@@ -283,7 +277,6 @@
 								${img}
 								<span style="font-weight:800;">${escapeHtml(title)}</span>
 								${badge}
-								${sub ? `<div class="muted mono" style="margin-top:2px;">@${escapeHtml(sub)}</div>` : ""}
 							</td>
 							<td class="mono">${escapeHtml(sinceText)}</td>
 							<td class="mono">${escapeHtml(durText)}</td>
@@ -292,10 +285,10 @@
 				}).join("")
 			}
 
-			async function refreshFriends() {
+			async function refreshFriends(){
 				updateConnectButtonLabel()
 
-				if (!hasAccessToken()) {
+				if (!hasAccessToken()){
 					setStatus("Not connected")
 					setAuthUi(false, "off")
 					setFriendsUi(0, "off")
@@ -303,7 +296,6 @@
 					return
 				}
 
-				// We have a token, start loading
 				setStatus("Loading…")
 				setAuthUi(true, "loading")
 				setFriendsUi(0, "loading")
@@ -312,19 +304,17 @@
 				let user
 				try {
 					user = await fetchUserInfo()
-				}
-				catch (e) {
-					// Auth/userinfo failed
+				} catch (e) {
+					console.error(e)
 					setStatus("Auth failed")
 					setAuthUi(true, "error")
 					setFriendsUi(0, "off")
 					renderPlaceholder("Failed to load user info. Try reconnecting.")
-					console.error(e)
 					return
 				}
 
 				const userId = Number(user?.sub || 0)
-				if (!Number.isFinite(userId) || userId <= 0) {
+				if (!Number.isFinite(userId) || userId <= 0){
 					setStatus("Auth failed")
 					setAuthUi(true, "error")
 					setFriendsUi(0, "off")
@@ -332,7 +322,6 @@
 					return
 				}
 
-				// Friends list stage
 				setStatus("Loading…")
 				setAuthUi(true, "ok")
 				setFriendsUi(0, "loading")
@@ -341,14 +330,12 @@
 				let friends = []
 				try {
 					friends = await fetchAllFriends(userId, { pageLimit: 100, hardCap: 5000 })
-				}
-				catch (e) {
-					// THIS is your requested behavior
+				} catch (e) {
+					console.error(e)
 					setStatus("Loading failed")
 					setAuthUi(true, "ok")
 					setFriendsUi(0, "error")
 					renderPlaceholder("Failed to fetch friends list (rate limited or endpoint error).")
-					console.error(e)
 					return
 				}
 
@@ -360,55 +347,41 @@
 				const headshotMap = new Map()
 
 				renderPlaceholder("Loading thumbnails…")
-
-				for (const part of chunk(ids, 100)) {
+				for (const part of chunk(ids, 100)){
 					try {
 						const m = await fetchAvatarHeadshots(part, { size: "48x48", isCircular: true })
 						for (const [k, v] of m.entries()) headshotMap.set(k, v)
-					}
-					catch (e) {
-						// Non-fatal
+					} catch (e) {
 						console.warn("Headshot fetch chunk failed:", e)
 					}
 				}
 
-				let db = loadDb()
-				db = ensureOwner(db, userId)
-				syncFriends(db, ids)
+				let dbState = loadDb()
+				dbState = ensureOwner(dbState, userId)
+				syncFriends(dbState, ids)
 
-				setStatus("Connected")
-				renderFriendsTable(friends, headshotMap, db)
-
-				if (location.search) {
-					history.replaceState({}, "", location.pathname)
-				}
+				renderFriendsTable(friends, headshotMap, dbState)
 			}
 
-			el.connectBtn?.addEventListener("click", async () => {
+			el.connectBtn.addEventListener("click", async () => {
 				try {
 					await startOAuthLogin()
-				}
-				catch (e) {
+				} catch (e) {
 					console.error(e)
 				}
 			})
 
-			el.disconnectBtn?.addEventListener("click", () => {
+			el.disconnectBtn.addEventListener("click", () => {
 				clearStoredTokens()
-				setAuthUi(false)
-				setFriendsUi(0, false)
+				updateConnectButtonLabel()
+				setStatus("Not connected")
+				setAuthUi(false, "off")
+				setFriendsUi(0, "off")
 				renderPlaceholder("Disconnected. Hit Connect Roblox to populate this list.")
 			})
 
 			updateConnectButtonLabel()
 			refreshFriends()
-
-			window.JFSC_DEV = {
-				signOut() {
-					clearStoredTokens()
-					location.reload()
-				}
-			}
 		</script>
 	</body>
 </html>

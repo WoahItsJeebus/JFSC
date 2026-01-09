@@ -31,6 +31,9 @@
 		],
 		"1.0.9": [
 			"Removed unused normBase function from API module."
+		],
+		"1.0.10": [
+			"Fixed friends list retrieval logic to use correct function."
 		]
 	}
 }

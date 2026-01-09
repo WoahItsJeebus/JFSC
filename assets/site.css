@@ -112,14 +112,14 @@ button:active{ transform:translateY(1px); }
 }
 
 .card{
-  border:1px solid var(--border);
-  border-radius:16px;
-  overflow:hidden;
-  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+	border:1px solid var(--border);
+	border-radius:16px;
+	overflow:hidden;
+	background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
 }
 
 .card .head{
-  padding:14px 14px 10px 14px;
+  padding:14px 14px 14px 14px;
   display:flex;
   align-items:center;
   justify-content:space-between;

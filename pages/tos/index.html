@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+		<meta name="theme-color" content="#0b0f17">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<title>JFSC — Terms of Service</title>
+
+		<link rel="icon" href="../../favicon.ico" sizes="any">
+		<link rel="stylesheet" href="../../assets/site.css">
+	</head>
+
+	<body>
+		<div class="grid" style="width: 100%;">
+			<header>
+				<div>
+					<h1>Terms of Service</h1>
+					<div class="sub">
+						These terms apply to your use of JFSC (Jeebus’ Friends Since Checker).
+					</div>
+				</div>
+				<div class="toolbar">
+					<div class="pill" id="updatedPill">Last updated: —</div>
+				</div>
+			</header>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Basics</div>
+				</div>
+				<div style="padding:14px;">
+					<ul style="margin:0; padding-left:18px;">
+						<li>JFSC is provided “as is” with no guarantees of uptime, accuracy, or availability.</li>
+						<li>You are responsible for your own use of the tool and any decisions you make based on its output.</li>
+						<li>JFSC’s “friends since” timestamps are based on app observation and/or manual entry, not official Roblox history.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Roblox accounts</div>
+				</div>
+				<div style="padding:14px;">
+					<p style="margin-top:0;">
+						JFSC uses Roblox OAuth with your permission. You must comply with Roblox’s Terms of Use and all applicable rules when using your account.
+					</p>
+					<p class="footer">
+						JFSC is not affiliated with or endorsed by Roblox.
+					</p>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Acceptable use</div>
+				</div>
+				<div style="padding:14px;">
+					<ul style="margin:0; padding-left:18px;">
+						<li>Don’t use JFSC to harass, dox, or target other users.</li>
+						<li>Don’t attempt to bypass Roblox security or misuse OAuth tokens.</li>
+						<li>Don’t intentionally overload Roblox endpoints (rate limiting exists and your access may be blocked).</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Limitations</div>
+				</div>
+				<div style="padding:14px;">
+					<ul style="margin:0; padding-left:18px;">
+						<li>JFSC may break if Roblox changes endpoints, permissions, or OAuth behavior.</li>
+						<li>Avatar thumbnails and friends lists may fail temporarily due to Roblox outages or rate limits.</li>
+						<li>JFSC stores data locally in your browser by default; clearing site data deletes your JFSC records.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Changes</div>
+				</div>
+				<div style="padding:14px;">
+					<p style="margin-top:0;">
+						These terms may change over time. If changes are significant, the “Last updated” date will change.
+					</p>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Contact</div>
+				</div>
+				<div style="padding:14px;">
+					<ul style="margin:0; padding-left:18px;">
+						<li>Roblox: <span class="mono">@WoahItsJeebus</span></li>
+						<li>GitHub: <span class="mono">WoahItsJeebus</span></li>
+					</ul>
+				</div>
+			</section>
+
+			<div class="footer">
+				<code class="inline" id="versionCode">v—</code>
+			</div>
+
+			<div class="tabsBar">
+				<nav class="tabs">
+					<a class="tabBtn" data-tab="home" href="../../"><span class="tabDot"></span> Home</a>
+					<a class="tabBtn" data-tab="about" href="../about/"><span class="tabDot"></span> About</a>
+					<a class="tabBtn" data-tab="settings" href="../settings/"><span class="tabDot"></span> Settings</a>
+				</nav>
+			</div>
+		</div>
+
+		<script type="module">
+			import {
+				initAppSettings,
+				startOrbBackgroundFromSettings,
+				autoMarkActiveTab,
+				JSTC_VERSION
+			} from "../../assets/site.js"
+
+			initAppSettings()
+			startOrbBackgroundFromSettings({ spawnEveryMs: 1500, sizeMin: 340, sizeMax: 760 })
+			autoMarkActiveTab("about")
+
+			document.getElementById("versionCode").textContent = `v${JSTC_VERSION}`
+
+			const updated = new Date().toLocaleDateString(undefined, { year:"numeric", month:"short", day:"2-digit" })
+			document.getElementById("updatedPill").textContent = `Last updated: ${updated}`
+		</script>
+	</body>
+</html>

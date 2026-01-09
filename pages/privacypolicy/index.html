@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+		<meta name="theme-color" content="#0b0f17">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<title>JFSC — Privacy Policy</title>
+
+		<link rel="icon" href="../../favicon.ico" sizes="any">
+		<link rel="stylesheet" href="../../assets/site.css">
+	</head>
+
+	<body>
+		<div class="grid" style="width: 100%;">
+			<header>
+				<div>
+					<h1>Privacy Policy</h1>
+					<div class="sub">
+						JFSC is a local-first tracker for “friends since” based on what the app observes after you authorize it.
+					</div>
+				</div>
+				<div class="toolbar">
+					<div class="pill" id="updatedPill">Last updated: —</div>
+				</div>
+			</header>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Summary</div>
+				</div>
+				<div style="padding:14px;">
+					<ul style="margin:0; padding-left:18px;">
+						<li><b>JFSC uses Roblox OAuth</b> to access your account’s friends list (connections) with your permission.</li>
+						<li><b>JFSC stores your “friends since” tracking locally</b> in your browser (localStorage) by default.</li>
+						<li><b>JFSC does not sell your data.</b></li>
+						<li><b>You can clear your data</b> at any time by clearing site data in your browser.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>What we collect</div>
+				</div>
+				<div style="padding:14px;">
+					<p class="muted" style="margin-top:0;">
+						When you connect Roblox, JFSC may access and/or store the following:
+					</p>
+
+					<ul style="margin:0; padding-left:18px;">
+						<li><b>Your Roblox user identifier</b> (user ID) to associate the local database with the currently connected account.</li>
+						<li><b>Your friends list</b> (friend user IDs + names/display names) to display your connections.</li>
+						<li><b>Avatar thumbnails</b> for each friend (via Roblox thumbnail endpoints) to improve readability.</li>
+						<li><b>JFSC tracking fields</b> such as:
+							<ul style="margin-top:6px; padding-left:18px;">
+								<li>First time JFSC observed a connection</li>
+								<li>Last time JFSC observed a connection</li>
+								<li>“Friends since” timestamp (observed or manually set)</li>
+								<li>Source marker (observed / manual / not yet recorded)</li>
+							</ul>
+						</li>
+					</ul>
+
+					<p class="footer">
+						<b>Important:</b> Roblox does not provide a true historical “friends since” timestamp to this app.
+						JFSC’s “friends since” is either the first time JFSC observed the friendship or a date you manually set.
+					</p>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Where your data is stored</div>
+				</div>
+				<div style="padding:14px;">
+					<p style="margin-top:0;">
+						By default, JFSC stores data <b>locally in your browser</b> using <span class="mono">localStorage</span>.
+						This means:
+					</p>
+					<ul style="margin:0; padding-left:18px;">
+						<li>Data is tied to this device + browser profile.</li>
+						<li>Clearing site data will remove your stored tracking info and sign-in tokens.</li>
+					</ul>
+
+					<p class="footer">
+						If JFSC adds optional cloud sync in the future, this policy will be updated before that feature becomes active.
+					</p>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>OAuth tokens</div>
+				</div>
+				<div style="padding:14px;">
+					<p style="margin-top:0;">
+						After you authorize JFSC, Roblox returns OAuth tokens. JFSC stores them locally so it can fetch your friends list.
+						You can remove tokens at any time by clearing site data.
+					</p>
+					<p class="footer">
+						If you share a device/browser profile, treat it like a logged-in session: other users could access your JFSC view.
+					</p>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Third-party services</div>
+				</div>
+				<div style="padding:14px;">
+					<p style="margin-top:0;">
+						JFSC calls Roblox endpoints to:
+					</p>
+					<ul style="margin:0; padding-left:18px;">
+						<li>Complete OAuth sign-in</li>
+						<li>Fetch your account information (user ID)</li>
+						<li>Fetch friends list (connections)</li>
+						<li>Fetch avatar thumbnails</li>
+					</ul>
+					<p class="footer">
+						These requests are made directly from your browser to Roblox servers.
+					</p>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Your choices</div>
+				</div>
+				<div style="padding:14px;">
+					<ul style="margin:0; padding-left:18px;">
+						<li><b>Disconnect:</b> clear site data to remove tokens.</li>
+						<li><b>Delete tracking data:</b> clear site data to remove the local friend database.</li>
+						<li><b>Manual edits:</b> you can manually set “friends since” dates for older friends the app didn’t record.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="card span2">
+				<div class="head">
+					<div class="title"><span class="statusDot"></span>Contact</div>
+				</div>
+				<div style="padding:14px;">
+					<p style="margin-top:0;">
+						Questions or issues?
+					</p>
+					<ul style="margin:0; padding-left:18px;">
+						<li>Roblox: <span class="mono">@WoahItsJeebus</span></li>
+						<li>GitHub: <span class="mono">WoahItsJeebus</span></li>
+					</ul>
+					<p class="footer">
+						(If you want a dedicated email contact, tell me what you want it to be and we’ll add it here.)
+					</p>
+				</div>
+			</section>
+
+			<div class="footer">
+				<code class="inline" id="versionCode">v—</code>
+			</div>
+
+			<div class="tabsBar">
+				<nav class="tabs">
+					<a class="tabBtn" data-tab="home" href="../../"><span class="tabDot"></span> Home</a>
+					<a class="tabBtn" data-tab="about" href="../about/"><span class="tabDot"></span> About</a>
+					<a class="tabBtn" data-tab="settings" href="../settings/"><span class="tabDot"></span> Settings</a>
+				</nav>
+			</div>
+		</div>
+
+		<script type="module">
+			import {
+				initAppSettings,
+				startOrbBackgroundFromSettings,
+				autoMarkActiveTab,
+				JSTC_VERSION
+			} from "../../assets/site.js"
+
+			initAppSettings()
+			startOrbBackgroundFromSettings({ spawnEveryMs: 1500, sizeMin: 340, sizeMax: 760 })
+			autoMarkActiveTab("about") // not a tab, but keeps dots consistent with JSTC behavior if you do it
+
+			document.getElementById("versionCode").textContent = `v${JSTC_VERSION}`
+
+			// Update date: you can hardcode later if you want
+			const updated = new Date().toLocaleDateString(undefined, { year:"numeric", month:"short", day:"2-digit" })
+			document.getElementById("updatedPill").textContent = `Last updated: ${updated}`
+		</script>
+	</body>
+</html>

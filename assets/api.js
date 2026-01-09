@@ -1,7 +1,34 @@
 // assets/api.js
-import { JFSC_OAUTH } from "./config.js"
+import { JFSC_OAUTH, JFSC_NET } from "./config.js"
 
 const TOKENS_KEY = "JFSC_OAUTH_TOKENS_v1"
+
+function normBase(s) {
+	return String(s || "").replace(/\/+$/, "")
+}
+
+function isLikelyCorsError(e) {
+	const msg = String(e?.message || e || "")
+	// In browsers, CORS blocks commonly show up as TypeError + “Failed to fetch”
+	return (e instanceof TypeError) || /failed to fetch|networkerror|cors|blocked/i.test(msg)
+}
+
+async function tryWithFallback(makeUrl, fetchOpts, bases) {
+	let lastErr = null
+
+	for (const base of bases) {
+		if (!base) continue
+		try {
+			return await robloxFetch(makeUrl(normBase(base)), fetchOpts)
+		} catch (e) {
+			lastErr = e
+			// Only fall back if it smells like CORS/network. Otherwise, surface real errors immediately.
+			if (!isLikelyCorsError(e)) throw e
+		}
+	}
+
+	throw lastErr || new Error("Request failed (no base URLs available).")
+}
 
 function sleep(ms) {
 	return new Promise((r) => setTimeout(r, ms))
@@ -70,12 +97,17 @@ async function robloxFetch(url, {
 
 		for (let attempt = 0; attempt <= retries; attempt++) {
 			try {
-				const res = await fetch(url, {
-					method,
-					headers: h,
-					body,
-					signal: ctrl.signal,
-				})
+				let res
+				try {
+					res = await fetch(url, {
+						method,
+						headers: h,
+						body,
+						signal: ctrl.signal,
+					})
+				} catch (e) {
+					throw new Error(`Fetch failed (likely CORS/network) for ${url}: ${e?.message || e}`)
+				}
 
 				// Retryable statuses
 				if ([429, 500, 502, 503, 504].includes(res.status) && attempt < retries) {
@@ -172,16 +204,20 @@ export async function fetchUserInfo() {
 }
 
 export async function fetchFriendsList(userId, { limit = 100, cursor = "" } = {}) {
-	// Public friends endpoint commonly used from browsers; include auth=false by default.
-	// If Roblox starts respecting privacy here, we can add an auth:true variant later.
-	const u = new URL(`https://friends.roblox.com/v1/users/${encodeURIComponent(userId)}/friends`)
-	u.searchParams.set("limit", String(limit))
-	if (cursor) u.searchParams.set("cursor", cursor)
+	const bases = [
+		JFSC_NET?.friendsBase,
+		JFSC_NET?.friendsFallbackBase,
+	]
 
-	return await robloxFetch(u.toString(), {
+	return await tryWithFallback((base) => {
+		const u = new URL(`${base}/v1/users/${encodeURIComponent(userId)}/friends`)
+		u.searchParams.set("limit", String(limit))
+		if (cursor) u.searchParams.set("cursor", cursor)
+		return u.toString()
+	}, {
 		auth: false,
 		expectJson: true,
-	})
+	}, bases)
 }
 
 export async function fetchAllFriends(userId, { pageLimit = 100, hardCap = 2000 } = {}) {
@@ -228,17 +264,22 @@ export async function fetchAvatarHeadshots(userIds, {
 
 	if (!ids.length) return new Map()
 
-	// Thumbnails endpoint supports comma-separated userIds
-	const u = new URL("https://thumbnails.roblox.com/v1/users/avatar-headshot")
-	u.searchParams.set("userIds", ids.join(","))
-	u.searchParams.set("size", size)
-	u.searchParams.set("format", format)
-	u.searchParams.set("isCircular", String(!!isCircular))
+	const bases = [
+		JFSC_NET?.thumbnailsBase,
+		JFSC_NET?.thumbnailsFallbackBase,
+	]
 
-	const data = await robloxFetch(u.toString(), {
+	const data = await tryWithFallback((base) => {
+		const u = new URL(`${base}/v1/users/avatar-headshot`)
+		u.searchParams.set("userIds", ids.join(","))
+		u.searchParams.set("size", size)
+		u.searchParams.set("format", format)
+		u.searchParams.set("isCircular", String(!!isCircular))
+		return u.toString()
+	}, {
 		auth: false,
 		expectJson: true,
-	})
+	}, bases)
 
 	const m = new Map()
 	const arr = Array.isArray(data?.data) ? data.data : []

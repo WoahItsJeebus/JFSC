@@ -19,6 +19,9 @@
 		"1.0.5": [
 			"Improved tab detection logic for active tab highlighting.",
 			"Attached logic for retrieving friends list."
+		],
+		"1.0.6": [
+			"Updated CORS proxy URL in API config & handler to use a fallback."
 		]
 	}
 }

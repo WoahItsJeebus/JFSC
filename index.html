@@ -147,6 +147,34 @@
 				connectBtn: document.getElementById("connectBtn"),
 				disconnectBtn: document.getElementById("disconnectBtn"),
 			}
+			
+			function setStatus(text){
+				el.statusPill.textContent = `Status: ${text}`
+			}
+
+			function setDotState(dotEl, state){
+				// state: "ok" | "loading" | "error" | "off"
+				dotEl.classList.remove("warn", "bad", "off")
+
+				if (state === "loading") dotEl.classList.add("warn")
+				else if (state === "error") dotEl.classList.add("bad")
+				else if (state === "off") dotEl.classList.add("off")
+				// "ok" = base .statusDot styling
+			}
+
+			function setAuthUi(connected, state){
+				el.authTag.textContent = connected ? "CONNECTED" : "DISCONNECTED"
+				setDotState(el.authDot, connected ? state : "off")
+			}
+
+			function setFriendsUi(count, state){
+				el.friendsTag.textContent = String(count ?? 0)
+				setDotState(el.friendsDot, state)
+			}
+
+			function updateConnectButtonLabel(){
+				el.connectBtn.textContent = hasAccessToken() ? "Reconnect Roblox" : "Connect Roblox"
+			}
 
 			function escapeHtml(s) {
 				return String(s)
@@ -265,18 +293,20 @@
 			}
 
 			async function refreshFriends() {
-				const connected = hasAccessToken()
-				setConnectedButtons(connected)
+				updateConnectButtonLabel()
 
-				if (!connected) {
-					setAuthUi(false)
-					setFriendsUi(0, false)
+				if (!hasAccessToken()) {
+					setStatus("Not connected")
+					setAuthUi(false, "off")
+					setFriendsUi(0, "off")
 					renderPlaceholder("Not connected yet. Hit Connect Roblox to populate this list.")
 					return
 				}
 
-				setAuthUi(true, "Loading")
-				setFriendsUi(0, true)
+				// We have a token, start loading
+				setStatus("Loading…")
+				setAuthUi(true, "loading")
+				setFriendsUi(0, "loading")
 				renderPlaceholder("Loading user…")
 
 				let user
@@ -284,8 +314,10 @@
 					user = await fetchUserInfo()
 				}
 				catch (e) {
-					setAuthUi(false, "Auth error")
-					setFriendsUi(0, false)
+					// Auth/userinfo failed
+					setStatus("Auth failed")
+					setAuthUi(true, "error")
+					setFriendsUi(0, "off")
 					renderPlaceholder("Failed to load user info. Try reconnecting.")
 					console.error(e)
 					return
@@ -293,12 +325,17 @@
 
 				const userId = Number(user?.sub || 0)
 				if (!Number.isFinite(userId) || userId <= 0) {
-					setAuthUi(false, "Bad user")
-					setFriendsUi(0, false)
+					setStatus("Auth failed")
+					setAuthUi(true, "error")
+					setFriendsUi(0, "off")
 					renderPlaceholder("OAuth userinfo did not include a valid user id.")
 					return
 				}
 
+				// Friends list stage
+				setStatus("Loading…")
+				setAuthUi(true, "ok")
+				setFriendsUi(0, "loading")
 				renderPlaceholder("Loading friends list…")
 
 				let friends = []
@@ -306,13 +343,18 @@
 					friends = await fetchAllFriends(userId, { pageLimit: 100, hardCap: 5000 })
 				}
 				catch (e) {
-					setFriendsUi(0, false)
-					renderPlaceholder(`Failed to fetch friends list. ${describeFetchError(e)}`)
+					// THIS is your requested behavior
+					setStatus("Loading failed")
+					setAuthUi(true, "ok")
+					setFriendsUi(0, "error")
+					renderPlaceholder("Failed to fetch friends list (rate limited or endpoint error).")
 					console.error(e)
 					return
 				}
 
-				setFriendsUi(friends.length, true)
+				setStatus("Connected")
+				setAuthUi(true, "ok")
+				setFriendsUi(friends.length, "ok")
 
 				const ids = friends.map((f) => f.id)
 				const headshotMap = new Map()
@@ -325,16 +367,16 @@
 						for (const [k, v] of m.entries()) headshotMap.set(k, v)
 					}
 					catch (e) {
+						// Non-fatal
 						console.warn("Headshot fetch chunk failed:", e)
 					}
 				}
 
 				let db = loadDb()
 				db = ensureOwner(db, userId)
-
 				syncFriends(db, ids)
 
-				setAuthUi(true, "Ready")
+				setStatus("Connected")
 				renderFriendsTable(friends, headshotMap, db)
 
 				if (location.search) {
@@ -358,6 +400,7 @@
 				renderPlaceholder("Disconnected. Hit Connect Roblox to populate this list.")
 			})
 
+			updateConnectButtonLabel()
 			refreshFriends()
 
 			window.JFSC_DEV = {

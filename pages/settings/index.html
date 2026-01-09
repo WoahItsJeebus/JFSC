@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+		<meta name="theme-color" content="#0b0f17">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+		<title>JSTC — Settings</title>
+		<link rel="icon" href="../../favicon.ico" sizes="any">
+		<link rel="stylesheet" href="../../assets/site.css">
+	</head>
+	<body>
+		<div class="wrap">
+			<header>
+				<div>
+					<h1>Settings</h1>
+					<div class="sub">
+						These settings are stored locally in your device's browser (<code class="inline">localStorage</code>).
+					</div>
+				</div>
+				<div class="toolbar">
+					<div class="okPill" id="saveState">Not saved yet</div>
+				</div>
+			</header>
+			<div class="grid">
+				<section class="card">
+					<div class="head">
+						<div class="title">Theme</div>
+						<div class="tag">LOCAL</div>
+					</div>
+					<div class="form">
+						<div class="field">
+							<div class="label">Background</div>
+							<div class="controlRow">
+								<input type="color" id="bg" />
+								<input type="text" id="bgText" />
+							</div>
+						</div>
+						<div class="field">
+							<div class="label">Card</div>
+							<div class="controlRow">
+								<input type="color" id="card" />
+								<input type="text" id="cardText" />
+							</div>
+						</div>
+						<div class="field">
+							<div class="label">Text</div>
+							<div class="controlRow">
+								<input type="color" id="text" />
+								<input type="text" id="textText" />
+							</div>
+						</div>
+						<div class="field">
+							<div class="label">Muted</div>
+							<div class="controlRow">
+								<input type="color" id="muted" />
+								<input type="text" id="mutedText" />
+							</div>
+						</div>
+						<div class="field">
+							<div class="label">Accent (Good)</div>
+							<div class="controlRow">
+								<input type="color" id="good" />
+								<input type="text" id="goodText" />
+							</div>
+						</div>
+						<div class="controlRow">
+							<button class="smallBtn" id="resetThemeBtn" type="button">Reset theme to defaults</button>
+						</div>
+					</div>
+				</section>
+				<section class="card">
+					<div class="head">
+						<div class="title">Background Orbs</div>
+						<div class="tag">LOCAL</div>
+					</div>
+					<div class="form">
+						<label class="switch">
+						<input type="checkbox" id="orbsEnabled" />
+						<span>Enable orbs</span>
+						</label>
+						<label class="switch">
+						<input type="checkbox" id="reduceMotion" />
+						<span>Reduce motion (forces orbs off)</span>
+						</label>
+						<div class="field">
+							<div class="label">Max orbs</div>
+							<div class="sliderControl">
+								<input type="range" id="maxOrbs" min="1" max="10" step="1" />
+								<span class="mono muted" id="maxOrbsVal">—</span>
+							</div>
+						</div>
+						<div class="field">
+							<div class="label">Opacity</div>
+							<div class="help">One slider controls both min/max range internally.</div>
+							<div class="sliderControl">
+								<input type="range" id="orbOpacity" min="0.05" max="1" step="0.05" />
+								<span class="mono muted" id="orbOpacityVal">—</span>
+							</div>
+						</div>
+						<div class="field">
+							<div class="label">Orb colors</div>
+							<div class="controlRow">
+								<input type="color" id="orbC0" />
+								<input type="color" id="orbC1" />
+								<input type="color" id="orbC2" />
+							</div>
+						</div>
+					</div>
+				</section>
+				<section class="card span2">
+					<div class="head">
+						<div class="title">Export / Import</div>
+						<div class="tag">JSON</div>
+					</div>
+					<div class="form">
+						<div class="help">
+							Export is useful if you want to copy settings between devices. (Not needed if your browser already syncs settings between devices.)
+						</div>
+						<textarea id="jsonBox" spellcheck="false"></textarea>
+						<div class="controlRow">
+							<button class="smallBtn" id="exportBtn" type="button">Export</button>
+							<button class="smallBtn" id="importBtn" type="button">Import</button>
+						</div>
+					</div>
+				</section>
+			</div>
+			<!-- <div class="cornerRefresh">
+				<button style="background:rgba(15, 21, 32, 0.98);" id="hardRefreshBtn" type="button" title="Refresh">↻</button>
+			</div> -->
+			<div class="footer">
+				<code class="inline" id="versionCode">v—</code>
+			</div>
+			<div class="tabsBar">
+				<nav class="tabs">
+					<a class="tabBtn" data-tab="home" href="../../"><span class="tabDot"></span> Home</a>
+					<a class="tabBtn" data-tab="about" href="../about/"><span class="tabDot"></span> About</a>
+					<a class="tabBtn active" data-tab="settings" href="./"><span class="tabDot"></span> Settings</a>
+				</nav>
+			</div>
+		</div>
+		<script type="module">
+			import {
+			  initAppSettings,
+			  loadAppSettings,
+			  saveAppSettings,
+			  applyAppSettings,
+			  getDefaultAppSettings,
+			  exportAppSettingsJson,
+			  importAppSettingsJson,
+			  startOrbBackgroundFromSettings,
+			  autoMarkActiveTab,
+			hardReload
+			} from "../../assets/site.js";
+			
+			import { JSTC_VERSION } from "../../assets/site.js";
+			document.getElementById("versionCode").textContent = `v${JSTC_VERSION}`;
+			
+			initAppSettings();
+			startOrbBackgroundFromSettings({ spawnEveryMs: 900, sizeMin: 300, sizeMax: 640 });
+			autoMarkActiveTab("settings");
+			
+			const saveState = document.getElementById("saveState");
+			
+			const els = {
+			  bg: document.getElementById("bg"),
+			  bgText: document.getElementById("bgText"),
+			  card: document.getElementById("card"),
+			  cardText: document.getElementById("cardText"),
+			  text: document.getElementById("text"),
+			  textText: document.getElementById("textText"),
+			  muted: document.getElementById("muted"),
+			  mutedText: document.getElementById("mutedText"),
+			  good: document.getElementById("good"),
+			  goodText: document.getElementById("goodText"),
+			
+			  resetThemeBtn: document.getElementById("resetThemeBtn"),
+			
+			  orbsEnabled: document.getElementById("orbsEnabled"),
+			  reduceMotion: document.getElementById("reduceMotion"),
+			  maxOrbs: document.getElementById("maxOrbs"),
+			  maxOrbsVal: document.getElementById("maxOrbsVal"),
+			  orbOpacity: document.getElementById("orbOpacity"),
+			  orbOpacityVal: document.getElementById("orbOpacityVal"),
+			  orbC0: document.getElementById("orbC0"),
+			  orbC1: document.getElementById("orbC1"),
+			  orbC2: document.getElementById("orbC2"),
+			
+			  jsonBox: document.getElementById("jsonBox"),
+			  exportBtn: document.getElementById("exportBtn"),
+			  importBtn: document.getElementById("importBtn"),
+			};
+			
+			function setSavedPill(ok) {
+			  saveState.textContent = ok ? "Saved" : "Not saved";
+			  saveState.style.color = ok ? "var(--good)" : "var(--muted)";
+			}
+			
+			function syncUiFromSettings(s) {
+			  const tv = s.themeVars;
+			
+			  // Theme color inputs
+			  els.bg.value = tv.bg;
+			  els.bgText.value = tv.bg;
+			
+			  els.card.value = tv.card;
+			  els.cardText.value = tv.card;
+			
+			  els.text.value = tv.text;
+			  els.textText.value = tv.text;
+			
+			  els.muted.value = tv.muted;
+			  els.mutedText.value = tv.muted;
+			
+			  els.good.value = tv.good;
+			  els.goodText.value = tv.good;
+			
+			  // Orbs
+			  els.orbsEnabled.checked = !!s.orbs?.enabled;
+			  els.reduceMotion.checked = !!s.reduceMotion;
+			
+			  const maxOrbs = Number(s.orbs?.maxOrbs ?? 5);
+			  els.maxOrbs.value = String(maxOrbs);
+			  els.maxOrbsVal.textContent = String(maxOrbs);
+			
+			  // opacity: if user saved a number, use it; if object, derive a sensible “max”
+			  const op = s.orbs?.opacity;
+			  let opVal = 0.6;
+			  if (typeof op === "number") opVal = op;
+			  else if (op && typeof op === "object" && typeof op.max === "number") opVal = op.max;
+			  els.orbOpacity.value = String(opVal);
+			  els.orbOpacityVal.textContent = String(opVal);
+			
+			  const cols = Array.isArray(s.orbs?.colors) ? s.orbs.colors : ["#20493f", "#306459", "#2f5e7e"];
+			  els.orbC0.value = cols[0] || "#20493f";
+			  els.orbC1.value = cols[1] || "#306459";
+			  els.orbC2.value = cols[2] || "#2f5e7e";
+			}
+			
+			function writeThemeVar(s, key, value) {
+			  if (!s.themeVars) s.themeVars = {};
+			  s.themeVars[key] = String(value || "").trim();
+			}
+			
+			function commit(s) {
+			  const ok = saveAppSettings(s);
+			  applyAppSettings(s);
+			  setSavedPill(ok);
+			}
+			
+			let S = loadAppSettings();
+			applyAppSettings(S);
+			syncUiFromSettings(S);
+			setSavedPill(true);
+			
+			// Theme binding helper
+			function bindColorPair(colorEl, textEl, key) {
+			  const onColor = () => {
+			    S = loadAppSettings(); // re-load to avoid stomping other controls
+			    writeThemeVar(S, key, colorEl.value);
+			    textEl.value = colorEl.value;
+			    commit(S);
+			  };
+			  const onText = () => {
+			    const v = textEl.value.trim();
+			    if (!v) return;
+			    S = loadAppSettings();
+			    writeThemeVar(S, key, v);
+			    // best-effort: set color picker if valid hex
+			    if (/^#([0-9a-fA-F]{6})$/.test(v)) colorEl.value = v;
+			    commit(S);
+			  };
+			
+			  colorEl.addEventListener("input", onColor);
+			  textEl.addEventListener("change", onText);
+			}
+			
+			bindColorPair(els.bg, els.bgText, "bg");
+			bindColorPair(els.card, els.cardText, "card");
+			bindColorPair(els.text, els.textText, "text");
+			bindColorPair(els.muted, els.mutedText, "muted");
+			bindColorPair(els.good, els.goodText, "good");
+			
+			els.resetThemeBtn.addEventListener("click", () => {
+			  const d = getDefaultAppSettings();
+			  S = loadAppSettings();
+			  S.themeVars = d.themeVars;
+			  commit(S);
+			  syncUiFromSettings(S);
+			});
+			
+			// Orbs
+			els.orbsEnabled.addEventListener("change", () => {
+			  S = loadAppSettings();
+			  if (!S.orbs) S.orbs = {};
+			  S.orbs.enabled = !!els.orbsEnabled.checked;
+			  commit(S);
+			});
+			
+			els.reduceMotion.addEventListener("change", () => {
+			  S = loadAppSettings();
+			  S.reduceMotion = !!els.reduceMotion.checked;
+			  commit(S);
+			});
+			
+			els.maxOrbs.addEventListener("input", () => {
+			  els.maxOrbsVal.textContent = els.maxOrbs.value;
+			});
+			els.maxOrbs.addEventListener("change", () => {
+			  S = loadAppSettings();
+			  if (!S.orbs) S.orbs = {};
+			  S.orbs.maxOrbs = Number(els.maxOrbs.value) || 5;
+			  commit(S);
+			});
+			
+			els.orbOpacity.addEventListener("input", () => {
+			  els.orbOpacityVal.textContent = els.orbOpacity.value;
+			});
+			els.orbOpacity.addEventListener("change", () => {
+			  S = loadAppSettings();
+			  if (!S.orbs) S.orbs = {};
+			  const v = Math.max(0, Math.min(1, Number(els.orbOpacity.value) || 0.6));
+			  // store as {min,max} so it still feels organic
+			  S.orbs.opacity = { min: Math.max(0, v - 0.25), max: v };
+			  commit(S);
+			});
+			
+			function updateOrbColors() {
+			  S = loadAppSettings();
+			  if (!S.orbs) S.orbs = {};
+			  S.orbs.colors = [els.orbC0.value, els.orbC1.value, els.orbC2.value];
+			  commit(S);
+			}
+			
+			els.orbC0.addEventListener("input", updateOrbColors);
+			els.orbC1.addEventListener("input", updateOrbColors);
+			els.orbC2.addEventListener("input", updateOrbColors);
+			document.getElementById("hardRefreshBtn")?.addEventListener("click", hardReload);
+			
+			// Export / Import
+			els.exportBtn.addEventListener("click", () => {
+			  els.jsonBox.value = exportAppSettingsJson();
+			});
+			
+			els.importBtn.addEventListener("click", () => {
+			  const res = importAppSettingsJson(els.jsonBox.value);
+			  if (!res.ok) {
+			    alert(res.error || "Import failed");
+			    return;
+			  }
+			  S = loadAppSettings();
+			  syncUiFromSettings(S);
+			  setSavedPill(true);
+			});
+			
+			// If another tab changes settings, resync UI here too
+			window.addEventListener("storage", (ev) => {
+			  if (ev.key !== "JSTC_SETTINGS_v1") return;
+			  S = loadAppSettings();
+			  syncUiFromSettings(S);
+			});
+		</script>
+	</body>
+</html>

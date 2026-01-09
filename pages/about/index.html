@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+		<title>Roblox Friends Since Checker — About</title>
+		<link rel="stylesheet" href="../../assets/site.css">
+		<link rel="icon" href="../../favicon.ico" sizes="any">
+	</head>
+	<body>
+		<div class="wrap">
+			<header>
+				<div>
+					<h1>About</h1>
+					<div class="sub">
+						Credits, links, known bugs, and release notes for this tool.
+					</div>
+				</div>
+			</header>
+			<div class="grid">
+				<section class="card span2">
+					<div class="head">
+						<div class="title"><span class="statusDot" style="background: rgb(0, 255, 255);"></span>Release Notes</div>
+						<div class="tag">versions.json</div>
+					</div>
+					<div style="padding:14px;">
+						<div class="rnControls">
+							<div class="muted mono rnLabel">Release</div>
+							<div class="selectWrap">
+								<select id="majorSelect"></select>
+							</div>
+							<div class="muted mono rnLabel">Version</div>
+							<div class="selectWrap">
+								<select id="versionSelect"></select>
+							</div>
+						</div>
+						<div class="footer" style="margin-top:0;" id="releaseNotesBody">
+							Loading release notes…
+						</div>
+					</div>
+				</section>
+				<section class="card span2">
+					<div class="head">
+						<div class="title"><span class="statusDot warn"></span>Known Bugs</div>
+						<div class="tag">bugs.json</div>
+					</div>
+					<div class="fadeWrap fadeScroll" id="bugsFade">
+						<div class="tableScroll" id="bugsScroll">
+							<table>
+								<thead>
+									<tr>
+										<th style="width:24%">Status</th>
+										<th>Bug</th>
+										<!-- <th style="width:18%">Info</th> -->
+										<th>Info</th>
+									</tr>
+								</thead>
+								<tbody id="bugsBody"></tbody>
+							</table>
+						</div>
+					</div>
+				</section>
+				<section class="card span2">
+					<div class="head">
+						<div class="title"><span class="statusDot"></span>Credits & Platforms</div>
+						<div class="tag">LINKS</div>
+					</div>
+					<div style="padding:14px;">
+						<div class="footer" style="margin-top:0;">
+							<span class="platformLinks hScroll fadeScroll" id="platformLinks"></span>
+						</div>
+					</div>
+				</section>
+			</div>
+			<!-- Footer -->
+			<!-- <div class="cornerRefresh">
+				<button style="background:rgba(15, 21, 32, 0.98);" id="hardRefreshBtn" type="button" title="Refresh">↻</button>
+			</div> -->
+			<div class="footer">
+				<code class="inline" id="versionCode">v—</code>
+			</div>
+			<div class="tabsBar">
+				<nav class="tabs">
+					<a class="tabBtn" data-tab="home" href="../../"><span class="tabDot"></span> Home</a>
+					<a class="tabBtn active" data-tab="about" href="./"><span class="tabDot"></span> About</a>
+					<a class="tabBtn" data-tab="settings" href="../settings/"><span class="tabDot"></span> Settings</a>
+				</nav>
+			</div>
+		</div>
+		<script type="module">
+			import {
+			  renderPlatformLinks,
+			  attachFadeScroll,
+			  attachFadeToScroller,
+			  autoMarkActiveTab,
+			  initAppSettings,
+			  startOrbBackgroundFromSettings,
+			  hardReload,
+			  JSTC_VERSION
+			} from "../../assets/site.js";
+			
+			// ===== Small helpers =====
+			function escapeHtml(s){
+			  return String(s).replace(/[&<>"']/g, c => ({
+			    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+			  }[c]));
+			}
+			
+			function isSemverLike(s){
+			  return /^\d+(\.\d+){1,3}$/.test(String(s || ""));
+			}
+			
+			function cmpSemverDesc(a, b){
+			  // For strings like "1.3.6". Fallback = string compare.
+			  if (!isSemverLike(a) || !isSemverLike(b)) return String(b).localeCompare(String(a));
+			  const pa = String(a).split(".").map(n => parseInt(n,10));
+			  const pb = String(b).split(".").map(n => parseInt(n,10));
+			  const len = Math.max(pa.length, pb.length);
+			  while (pa.length < len) pa.push(0);
+			  while (pb.length < len) pb.push(0);
+			  for (let i=0; i<len; i++){
+			    if (pa[i] !== pb[i]) return pb[i] - pa[i];
+			  }
+			  return 0;
+			}
+			
+			function statusLabel(s){
+			  const v = String(s || "").toLowerCase();
+			  if (v === "fixed") return "Fixed";
+			  if (v === "investigating") return "Investigating";
+			  if (v === "wontfix") return "Won’t fix";
+			  return "Open";
+			}
+			
+			function statusDotClass(s){
+			  const v = String(s || "").toLowerCase();
+			  if (v === "fixed") return "statusDot";
+			  if (v === "investigating") return "statusDot warn";
+			  if (v === "wontfix") return "statusDot off";
+			  return "statusDot bad";
+			}
+			
+			// ===== Bugs (from /assets/bugs.json) =====
+			function renderBugs(list){
+			  const body = document.getElementById("bugsBody");
+			  body.textContent = "";
+			
+			  if (!Array.isArray(list) || list.length === 0){
+			    const tr = document.createElement("tr");
+			    tr.innerHTML = `
+			      <td class="mono muted">—</td>
+			      <td class="muted">No known bugs listed.</td>
+			      <td class="mono muted">—</td>
+			    `;
+			    body.appendChild(tr);
+			    return;
+			  }
+			
+			  for (const item of list){
+			    const status = item?.status || "open";
+			    const bug = item?.bug || "—";
+			    const info = item?.fixedIn ? `Fixed in ${item.fixedIn}` : (item?.note || "—");
+			
+			    const tr = document.createElement("tr");
+			    tr.innerHTML = `
+			      <td class="mono">
+			        <span style="display:inline-flex;align-items:center;gap:10px;">
+			          <span class="${statusDotClass(status)}"></span>
+			          <span class="muted">${escapeHtml(statusLabel(status))}</span>
+			        </span>
+			      </td>
+			      <td>${escapeHtml(bug)}</td>
+			      <td class="mono muted">${escapeHtml(info)}</td>
+			    `;
+			    body.appendChild(tr);
+			  }
+			}
+			
+			async function loadBugsJson(){
+			  const body = document.getElementById("bugsBody");
+			  try {
+			    const res = await fetch("../../assets/bugs.json", { cache: "no-store" });
+			    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			    renderBugs(await res.json());
+			  } catch (err) {
+			    body.textContent = "";
+			    const tr = document.createElement("tr");
+			    tr.innerHTML = `
+			      <td class="mono muted">—</td>
+			      <td class="muted">Failed to load bugs.json (${escapeHtml(err?.message || err)})</td>
+			      <td class="mono muted">—</td>
+			    `;
+			    body.appendChild(tr);
+			  }
+			}
+			
+			// ===== Release Notes (filter by major -> version -> notes) =====
+			let VERSIONS_DATA = null;
+			
+			function setSelectOptions(sel, values, selectedValue){
+			  sel.textContent = "";
+			  for (const v of values){
+			    const opt = document.createElement("option");
+			    opt.value = v;
+			    opt.textContent = v;
+			    sel.appendChild(opt);
+			  }
+			  if (selectedValue && values.includes(selectedValue)){
+			    sel.value = selectedValue;
+			  } else if (values.length){
+			    sel.value = values[0];
+			  }
+			}
+			
+			function findMajorForVersion(data, versionStr){
+			  for (const major of Object.keys(data || {})){
+			    const majorObj = data[major];
+			    if (majorObj && typeof majorObj === "object" && Object.prototype.hasOwnProperty.call(majorObj, versionStr)){
+			      return major;
+			    }
+			  }
+			  return null;
+			}
+			
+			function renderSelectedReleaseNotes(){
+			  const host = document.getElementById("releaseNotesBody");
+			  const majorSel = document.getElementById("majorSelect");
+			  const verSel = document.getElementById("versionSelect");
+			
+			  const major = majorSel.value;
+			  const ver = verSel.value;
+			
+			  const majorObj = VERSIONS_DATA?.[major];
+			  const msgs = majorObj?.[ver];
+			
+			  if (!Array.isArray(msgs) || msgs.length === 0){
+			    host.innerHTML = `<div class="muted">No notes listed for <span class="mono">${escapeHtml(ver)}</span>.</div>`;
+			    return;
+			  }
+			
+			  // Nice header + bullet list
+			  const title = `<div style="font-weight:900; margin-bottom:6px;">
+			    <span class="mono"><b>${escapeHtml(ver)}</b></span>
+			    <span class="muted" style="font-weight:700;"><i>(release ${escapeHtml(major)})</i></span>
+			  </div>`;
+			
+			  const items = msgs.map(m => `<li>${escapeHtml(m)}</li>`).join("");
+			  host.innerHTML = `${title}<ul style="margin:6px 0 0 18px; padding:0; color:var(--muted);">${items}</ul>`;
+			}
+			
+			function rebuildVersionSelectForMajor(major, preferredVersion){
+			  const verSel = document.getElementById("versionSelect");
+			  const majorObj = VERSIONS_DATA?.[major] || {};
+			  const versions = Object.keys(majorObj).sort(cmpSemverDesc);
+			
+			  setSelectOptions(verSel, versions, preferredVersion);
+			  renderSelectedReleaseNotes();
+			}
+			
+			function initReleaseNotesUI(data){
+			  VERSIONS_DATA = data || {};
+			
+			  const majorSel = document.getElementById("majorSelect");
+			  const verSel = document.getElementById("versionSelect");
+			  const host = document.getElementById("releaseNotesBody");
+			
+			  const majors = Object.keys(VERSIONS_DATA).sort(cmpSemverDesc);
+			  if (!majors.length){
+			    host.textContent = "No release notes found.";
+			    return;
+			  }
+			
+			  // Prefer current app version, if present
+			  const preferredMajor = findMajorForVersion(VERSIONS_DATA, JSTC_VERSION) || majors[0];
+			  setSelectOptions(majorSel, majors, preferredMajor);
+			
+			  // Build sub-version list (prefer JSTC_VERSION if it exists in that major)
+			  const initialMajor = majorSel.value;
+			  const preferVersion = Object.prototype.hasOwnProperty.call(VERSIONS_DATA[initialMajor] || {}, JSTC_VERSION)
+			    ? JSTC_VERSION
+			    : null;
+			
+			  rebuildVersionSelectForMajor(initialMajor, preferVersion);
+			
+			  majorSel.addEventListener("change", () => {
+			    rebuildVersionSelectForMajor(majorSel.value, null);
+			  });
+			
+			  verSel.addEventListener("change", () => {
+			    renderSelectedReleaseNotes();
+			  });
+			}
+			
+			async function loadVersionsJson(){
+			  const host = document.getElementById("releaseNotesBody");
+			  try {
+			    const res = await fetch("../../assets/versions.json", { cache: "no-store" });
+			    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			    const data = await res.json();
+			    initReleaseNotesUI(data);
+			  } catch (err) {
+			    host.textContent = `Failed to load release notes. (${err?.message || err})`;
+			  }
+			}
+			
+			// ===== Startup =====
+			initAppSettings();
+			startOrbBackgroundFromSettings({ spawnEveryMs: 1600, sizeMin: 340, sizeMax: 720 });
+			
+			document.getElementById("versionCode").textContent = `v${JSTC_VERSION}`;
+			document.getElementById("hardRefreshBtn")?.addEventListener("click", hardReload);
+			
+			const platformLinks = [
+			  { label: "GitHub", url: "https://github.com/WoahItsJeebus" },
+			  { label: "Roblox", url: "https://www.roblox.com/users/3817884/profile" },
+			];
+			renderPlatformLinks(platformLinks, "platformLinks");
+			attachFadeScroll(document.getElementById("platformLinks"));
+			
+			attachFadeToScroller(
+			  document.getElementById("bugsScroll"),
+			  document.getElementById("bugsFade")
+			);
+			
+			loadBugsJson();
+			loadVersionsJson();
+			
+			autoMarkActiveTab("about");
+		</script>
+	</body>
+</html>
+<!--
+	{
+		"status": "wontfix",		-- (wontfix || open || investigating || fixed)
+		"bug": "",					-- (string) — Description of the bug
+		"note": "",					-- (string) — Side notes
+		"fixedin": "",				-- (string) — Version number — (fixed status only)
+	}
+	-->

@@ -1,0 +1,7 @@
+[
+	{
+		"status": "investigating",
+		"bug": "Background orbs can be laggy at higher max capacities.",
+		"note": "Lower MaxOrbs or disable orbs entirely to greatly improve performance (and lower chance of overheating mobile devices)."
+	}
+]

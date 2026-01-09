@@ -6,12 +6,12 @@ export const JFSC_OAUTH = {
 }
 
 export const JFSC_NET = {
-	// Try official Roblox endpoints first…
 	friendsBase: "https://friends.roblox.com",
-	thumbnailsBase: "https://thumbnails.roblox.com",
-
-	// …but fall back automatically if the browser blocks CORS.
-	// (RoProxy mirrors Roblox subdomains and typically adds permissive CORS headers.)
 	friendsFallbackBase: "https://friends.roproxy.com",
+
+	thumbnailsBase: "https://thumbnails.roblox.com",
 	thumbnailsFallbackBase: "https://thumbnails.roproxy.com",
+
+	usersBase: "https://users.roblox.com",
+	usersFallbackBase: "https://users.roproxy.com",
 }

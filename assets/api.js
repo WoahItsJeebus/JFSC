@@ -46,6 +46,47 @@ function isObj(v) {
 	return v && typeof v === "object"
 }
 
+function normBase(s){
+	return String(s || "").replace(/\/+$/, "")
+}
+
+function isLikelyCorsError(e){
+	const msg = String(e?.message || e || "")
+	return (e instanceof TypeError) || /failed to fetch|networkerror|cors|blocked/i.test(msg)
+}
+
+async function tryWithFallback(makeUrl, fetchOpts, bases){
+	let lastErr = null
+
+	for (const base of bases){
+		if (!base) continue
+		try {
+			return await robloxFetch(makeUrl(normBase(base)), fetchOpts)
+		} catch (e) {
+			lastErr = e
+			if (!isLikelyCorsError(e)) throw e
+		}
+	}
+
+	throw lastErr || new Error("Request failed.")
+}
+
+async function mapWithConcurrency(items, concurrency, fn){
+	const out = new Array(items.length)
+	let i = 0
+
+	const workers = Array.from({ length: Math.max(1, concurrency|0) }, async () => {
+		while (true){
+			const idx = i++
+			if (idx >= items.length) return
+			out[idx] = await fn(items[idx], idx)
+		}
+	})
+
+	await Promise.all(workers)
+	return out
+}
+
 export function getStoredTokens() {
 	const raw = localStorage.getItem(TOKENS_KEY)
 	return raw ? safeJsonParse(raw) : null
@@ -220,6 +261,45 @@ export async function fetchFriendsList(userId, { limit = 100, cursor = "" } = {}
 	}, bases)
 }
 
+export async function fetchUserById(userId){
+	const bases = [
+		JFSC_NET?.usersBase,
+		JFSC_NET?.usersFallbackBase,
+	]
+
+	return await tryWithFallback((base) => {
+		return `${base}/v1/users/${encodeURIComponent(userId)}`
+	}, {
+		auth: false,
+		expectJson: true,
+	}, bases)
+}
+
+async function resolveUsersBasic(userIds, { concurrency = 8 } = {}){
+	const ids = (userIds || [])
+		.map((n) => Number(n))
+		.filter((n) => Number.isFinite(n) && n > 0)
+
+	const map = new Map()
+	if (!ids.length) return map
+
+	const results = await mapWithConcurrency(ids, concurrency, async (id) => {
+		try {
+			const u = await fetchUserById(id)
+			return {
+				id,
+				name: String(u?.name || ""),
+				displayName: String(u?.displayName || ""),
+			}
+		} catch {
+			return { id, name: "", displayName: "" }
+		}
+	})
+
+	for (const r of results) map.set(r.id, r)
+	return map
+}
+
 export async function fetchAllFriends(userId, { pageLimit = 100, hardCap = 2000 } = {}) {
 	const out = []
 	let cursor = ""
@@ -231,12 +311,11 @@ export async function fetchAllFriends(userId, { pageLimit = 100, hardCap = 2000 
 		const items = Array.isArray(data?.data) ? data.data : []
 		out.push(...items)
 
-		// Roblox uses variants across endpoints; handle a few common ones
 		const next =
 			data?.nextPageCursor ??
 			data?.nextCursor ??
 			data?.nextPageToken ??
-			null
+			""
 
 		if (!next) break
 		cursor = next
@@ -244,13 +323,29 @@ export async function fetchAllFriends(userId, { pageLimit = 100, hardCap = 2000 
 		if (out.length >= hardCap) break
 	}
 
-	// Normalize to simplest shape
-	return out.map((f) => ({
+	const normalized = out.map((f) => ({
 		id: Number(f?.id ?? f?.userId ?? 0),
 		name: String(f?.name ?? f?.username ?? ""),
 		displayName: String(f?.displayName ?? f?.display_name ?? ""),
 	}))
 		.filter((f) => Number.isFinite(f.id) && f.id > 0)
+
+	// If Roblox stops returning names/displayNames, enrich via Users API
+	const anyNames = normalized.some((f) => (f.name && f.name.trim()) || (f.displayName && f.displayName.trim()))
+	if (!anyNames && normalized.length){
+		const ids = normalized.map((f) => f.id)
+		const infoMap = await resolveUsersBasic(ids, { concurrency: 8 })
+
+		for (const f of normalized){
+			const u = infoMap.get(f.id)
+			if (u){
+				if (!f.name) f.name = u.name || ""
+				if (!f.displayName) f.displayName = u.displayName || ""
+			}
+		}
+	}
+
+	return normalized
 }
 
 export async function fetchAvatarHeadshots(userIds, {

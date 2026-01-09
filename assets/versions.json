@@ -40,6 +40,9 @@
 		],
 		"1.0.12": [
 			"Updated Tracked Friends card to load locally saved friends while fetching new data in the background."
+		],
+		"1.0.13": [
+			"Fixed an issue where the friends list would not update correctly after fetching new data."
 		]
 	}
 }

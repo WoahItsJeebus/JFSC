@@ -205,7 +205,7 @@
 				setStatus("Boot failed")
 				setAuthUi(false, "error")
 				setFriendsUi(0, "off")
-				renderPlaceholder("App boot failed. Open console for details.")
+				renderPlaceholder(`App boot failed. Open console for details.`)
 				throw e
 			}
 
@@ -221,24 +221,166 @@
 				loadDb,
 				ensureOwner,
 				syncFriends,
-				loadFriendsCache,
-				saveFriendsCache,
+				setManualFriendsSince,
+				clearRecordedFriendsSince,
 				formatLocalDateTime,
 				formatDurationSince,
+				loadFriendsCache,
+				saveFriendsCache,
 			} = db
+
+			const state = {
+				userId: null,
+				db: null,
+				friends: [],
+				headshotMap: new Map(),
+				openEditorUserId: null,
+				durationTimer: null,
+			}
 
 			function updateConnectButtonLabel(){
 				el.connectBtn.textContent = hasAccessToken() ? "Reconnect Roblox" : "Connect Roblox"
 				el.disconnectBtn.style.display = hasAccessToken() ? "" : "none"
 			}
 
-			function renderFriendsTable(friends, headshotMap, dbState){
-				const now = Date.now()
+			function badgeFor(rec){
+				if (!rec) return { label: "LEGACY", source: "not_recorded" }
+				if (rec.source === "manual") return { label: "MANUAL", source: "manual" }
+				if (rec.friendsSinceMs) return { label: "OBSERVED", source: rec.source || "observed" }
+				return { label: "LEGACY", source: rec.source || "not_recorded" }
+			}
 
-				const rows = friends.map((f) => {
+			function two(n){
+				return String(n).padStart(2, "0")
+			}
+
+			function msToLocalDateInput(ms){
+				if (!Number.isFinite(ms) || ms <= 0) return ""
+				const d = new Date(ms)
+				return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`
+			}
+
+			function localDateInputToMs(v){
+				// v: "YYYY-MM-DD" (local)
+				if (!v || typeof v !== "string") return null
+				const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+				if (!m) return null
+				const y = Number(m[1])
+				const mo = Number(m[2])
+				const d = Number(m[3])
+				if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null
+				return new Date(y, mo - 1, d, 0, 0, 0, 0).getTime()
+			}
+
+			function tickDurations(){
+				const now = Date.now()
+				const nodes = el.friendsBody.querySelectorAll(".durText")
+				for (const n of nodes){
+					const ms = Number(n.dataset.sinceMs || 0)
+					n.textContent = formatDurationSince(ms, { now })
+				}
+			}
+
+			function startDurationTicker(){
+				if (state.durationTimer) clearInterval(state.durationTimer)
+				state.durationTimer = setInterval(tickDurations, 1000)
+				tickDurations()
+			}
+
+			function closeOpenEditor(){
+				if (!state.openEditorUserId) return
+				const uid = state.openEditorUserId
+				state.openEditorUserId = null
+				updateRowFromDb(uid)
+			}
+
+			function updateRowFromDb(userId){
+				const uid = Number(userId)
+				if (!Number.isFinite(uid) || uid <= 0) return
+
+				const rec = state.db?.friends?.[String(uid)] || null
+				const sinceMs = rec?.friendsSinceMs ?? 0
+				const badge = badgeFor(rec)
+
+				const sinceSpan = el.friendsBody.querySelector(`.sinceText[data-uid="${uid}"]`)
+				const durSpan = el.friendsBody.querySelector(`.durText[data-uid="${uid}"]`)
+				const badgeSpan = el.friendsBody.querySelector(`.badgeTag[data-uid="${uid}"]`)
+				const sinceCell = el.friendsBody.querySelector(`td[data-cell="since"][data-uid="${uid}"]`)
+
+				if (sinceSpan){
+					sinceSpan.dataset.sinceMs = String(sinceMs || 0)
+					sinceSpan.textContent = sinceMs ? formatLocalDateTime(sinceMs) : "Not yet recorded"
+				}
+				if (durSpan){
+					durSpan.dataset.sinceMs = String(sinceMs || 0)
+				}
+				if (badgeSpan){
+					badgeSpan.textContent = badge.label
+				}
+				// If we were in editor mode, restore the cell UI.
+				if (sinceCell && !sinceSpan){
+					// Rebuild the entire cell.
+					const sinceText = sinceMs ? formatLocalDateTime(sinceMs) : "Not yet recorded"
+					sinceCell.innerHTML = `
+						<span class="sinceText" data-uid="${uid}" data-since-ms="${sinceMs || 0}">${escapeHtml(sinceText)}</span>
+						<button type="button" class="smallBtn" data-action="edit-since" data-uid="${uid}" style="margin-left:8px; padding:6px 8px;">Edit</button>
+					`
+				}
+				tickDurations()
+			}
+
+			function openEditor(userId){
+				const uid = Number(userId)
+				if (!Number.isFinite(uid) || uid <= 0) return
+				if (state.openEditorUserId && state.openEditorUserId !== uid) closeOpenEditor()
+				state.openEditorUserId = uid
+
+				const sinceCell = el.friendsBody.querySelector(`td[data-cell="since"][data-uid="${uid}"]`)
+				if (!sinceCell) return
+
+				const rec = state.db?.friends?.[String(uid)] || null
+				const sinceMs = rec?.friendsSinceMs ?? 0
+				const v = sinceMs ? msToLocalDateInput(sinceMs) : ""
+
+				sinceCell.innerHTML = `
+					<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+						<input
+							type="date"
+							value="${escapeHtml(v)}"
+							data-uid="${uid}"
+							class="sinceInput"
+							style="
+								width: 160px;
+								color: var(--text);
+								background: rgba(0,0,0,.18);
+								border: 1px solid var(--border);
+								border-radius: 10px;
+								padding: 8px 10px;
+								font-family: var(--mono);
+								font-size: 12px;
+								outline: none;
+							"
+						/>
+						<button type="button" class="smallBtn" data-action="save-since" data-uid="${uid}" style="font-weight:800; padding:6px 10px;">Save</button>
+						<button type="button" class="smallBtn" data-action="clear-since" data-uid="${uid}" style="padding:6px 10px;">Clear</button>
+						<button type="button" class="smallBtn" data-action="cancel-since" data-uid="${uid}" style="padding:6px 10px;">Cancel</button>
+					</div>
+					<div class="muted" style="margin-top:8px;">Set the date you became friends (local date). Time isn’t tracked.</div>
+				`
+
+				const input = sinceCell.querySelector("input.sinceInput")
+				if (input) input.focus()
+			}
+
+			function renderFriendsTable(friends, headshotMap, dbState){
+				state.friends = friends || []
+				state.headshotMap = headshotMap || new Map()
+				state.db = dbState || state.db
+
+				const rows = (friends || []).map((f) => {
 					const rec = dbState?.friends?.[String(f.id)] || null
 					const friendsSinceMs = rec?.friendsSinceMs ?? null
-					const source = rec?.source ?? "not_recorded"
+					const badge = badgeFor(rec)
 
 					return {
 						id: f.id,
@@ -246,7 +388,7 @@
 						displayName: f.displayName || "",
 						img: headshotMap.get(f.id) || "",
 						friendsSinceMs,
-						source,
+						badge,
 					}
 				})
 
@@ -261,13 +403,7 @@
 				el.friendsBody.innerHTML = rows.map((r) => {
 					const title = r.displayName || r.name || `User ${r.id}`
 					const sinceText = r.friendsSinceMs ? formatLocalDateTime(r.friendsSinceMs) : "Not yet recorded"
-					const durText = formatDurationSince(r.friendsSinceMs, { now })
-
-					const badge = r.source === "manual"
-						? `<span class="tag" style="margin-left:8px;">MANUAL</span>`
-						: r.friendsSinceMs
-							? `<span class="tag" style="margin-left:8px;">OBSERVED</span>`
-							: `<span class="tag" style="margin-left:8px;">LEGACY</span>`
+					const sinceMs = r.friendsSinceMs || 0
 
 					const img = r.img
 						? `<img src="${escapeHtml(r.img)}" alt="" style="width:28px;height:28px;border-radius:999px;vertical-align:middle;margin-right:10px;box-shadow:0 0 0 1px rgba(255,255,255,.12);">`
@@ -278,13 +414,18 @@
 							<td>
 								${img}
 								<span style="font-weight:800;">${escapeHtml(title)}</span>
-								${badge}
+								<span class="tag badgeTag" data-uid="${r.id}" style="margin-left:8px;">${escapeHtml(r.badge.label)}</span>
 							</td>
-							<td class="mono">${escapeHtml(sinceText)}</td>
-							<td class="mono">${escapeHtml(durText)}</td>
+							<td class="mono" data-cell="since" data-uid="${r.id}">
+								<span class="sinceText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(sinceText)}</span>
+								<button type="button" class="smallBtn" data-action="edit-since" data-uid="${r.id}" style="margin-left:8px; padding:6px 8px;">Edit</button>
+							</td>
+							<td class="mono"><span class="durText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(formatDurationSince(sinceMs, { now: Date.now() }))}</span></td>
 						</tr>
 					`
 				}).join("")
+
+				startDurationTicker()
 			}
 
 			async function refreshFriends(){
@@ -298,23 +439,26 @@
 					return
 				}
 
-				// 1) Try to show cached friends instantly (if available)
-				let dbState = null
-				let cached = null
+				// Try to show cached friends instantly (if supported)
+				state.db = null
+				state.userId = null
+				state.friends = []
+				state.headshotMap = new Map()
+				state.openEditorUserId = null
 
+				let cached = null
 				try {
-					dbState = loadDb()
-					cached = loadFriendsCache(dbState)
+					state.db = loadDb()
+					if (typeof loadFriendsCache === "function") cached = loadFriendsCache(state.db)
 				} catch (e) {
 					console.warn("Local cache load failed:", e)
 				}
 
-				// If we have cache, show it immediately and refresh in background
-				if (cached && cached.friends.length){
+				if (cached && cached.friends?.length) {
 					setStatus("Updating…")
 					setAuthUi(true, "loading")
 					setFriendsUi(cached.friends.length, "loading")
-					renderFriendsTable(cached.friends, cached.headshotMap, dbState)
+					renderFriendsTable(cached.friends, cached.headshotMap || new Map(), state.db)
 				} else {
 					setStatus("Loading…")
 					setAuthUi(true, "loading")
@@ -322,7 +466,6 @@
 					renderPlaceholder("Loading user…")
 				}
 
-				// 2) Fetch user info
 				let user
 				try {
 					user = await fetchUserInfo()
@@ -330,14 +473,8 @@
 					console.error(e)
 					setStatus("Auth failed")
 					setAuthUi(true, "error")
-
-					// Keep cached view if we had one
-					if (cached && cached.friends.length){
-						setFriendsUi(cached.friends.length, "ok")
-					} else {
-						setFriendsUi(0, "off")
-						renderPlaceholder("Failed to load user info. Try reconnecting.")
-					}
+					setFriendsUi(0, "off")
+					renderPlaceholder("Failed to load user info. Try reconnecting.")
 					return
 				}
 
@@ -345,53 +482,27 @@
 				if (!Number.isFinite(userId) || userId <= 0){
 					setStatus("Auth failed")
 					setAuthUi(true, "error")
-
-					if (cached && cached.friends.length){
-						setFriendsUi(cached.friends.length, "ok")
-					} else {
-						setFriendsUi(0, "off")
-						renderPlaceholder("OAuth userinfo did not include a valid user id.")
-					}
+					setFriendsUi(0, "off")
+					renderPlaceholder("OAuth userinfo did not include a valid user id.")
 					return
 				}
 
-				// 3) Tie DB to correct owner (switching accounts resets DB)
-				let ownerMismatch = false
-				try {
-					const preOwner = dbState?.ownerUserId ?? null
-					dbState = ensureOwner(dbState || loadDb(), userId)
-					ownerMismatch = (preOwner != null && preOwner !== userId)
-				} catch (e) {
-					console.warn("DB ensureOwner failed:", e)
-					dbState = loadDb()
-				}
-
-				// If owner mismatch, cached view is potentially wrong — stop treating it as cache.
-				if (ownerMismatch){
-					cached = null
+				setStatus("Updating…")
+				setAuthUi(true, "ok")
+				if (!cached || !cached.friends?.length){
 					setFriendsUi(0, "loading")
 					renderPlaceholder("Loading friends list…")
 				}
-
-				// 4) Fetch friends list (live refresh)
-				setStatus("Updating…")
-				setAuthUi(true, "ok")
 
 				let friends = []
 				try {
 					friends = await fetchAllFriends(userId, { pageLimit: 100, hardCap: 5000 })
 				} catch (e) {
 					console.error(e)
-					setStatus("Update failed")
+					setStatus("Loading failed")
 					setAuthUi(true, "ok")
-
-					// Keep cached view if we had one
-					if (cached && cached.friends.length){
-						setFriendsUi(cached.friends.length, "ok")
-					} else {
-						setFriendsUi(0, "error")
-						renderPlaceholder("Failed to fetch friends list (rate limited or endpoint error).")
-					}
+					setFriendsUi(0, "error")
+					renderPlaceholder("Failed to fetch friends list (rate limited or endpoint error).")
 					return
 				}
 
@@ -399,14 +510,12 @@
 				setAuthUi(true, "ok")
 				setFriendsUi(friends.length, "ok")
 
-				// 5) Headshots: start from cached headshots if present, then fill missing only
 				const ids = friends.map((f) => f.id)
 				const headshotMap = new Map(cached?.headshotMap ? cached.headshotMap : [])
 
 				const missing = ids.filter((id) => !headshotMap.get(id))
 				if (missing.length){
-					if (!cached) renderPlaceholder("Loading thumbnails…")
-
+					if (!cached || !cached.friends?.length) renderPlaceholder("Loading thumbnails…")
 					for (const part of chunk(missing, 100)){
 						try {
 							const m = await fetchAvatarHeadshots(part, { size: "48x48", isCircular: true })
@@ -417,24 +526,72 @@
 					}
 				}
 
-				// 6) Sync and cache
-				try {
-					syncFriends(dbState, ids)
-					saveFriendsCache(dbState, friends, headshotMap)
-				} catch (e) {
-					console.warn("Sync/cache save failed:", e)
+				let dbState = state.db || loadDb()
+				dbState = ensureOwner(dbState, userId)
+				syncFriends(dbState, ids)
+				state.db = dbState
+				state.userId = userId
+				state.friends = friends
+				state.headshotMap = headshotMap
+
+				if (typeof saveFriendsCache === "function"){
+					try { saveFriendsCache(dbState, friends, headshotMap) } catch (e) { console.warn("Cache save failed:", e) }
 				}
 
 				renderFriendsTable(friends, headshotMap, dbState)
 			}
+
+			el.friendsBody.addEventListener("click", (ev) => {
+				const btn = ev.target.closest("button[data-action]")
+				if (!btn) return
+				const action = btn.dataset.action
+				const uid = Number(btn.dataset.uid || 0)
+				if (!Number.isFinite(uid) || uid <= 0) return
+
+				if (action === "edit-since") {
+					openEditor(uid)
+					return
+				}
+
+				if (action === "cancel-since") {
+					closeOpenEditor()
+					return
+				}
+
+				if (action === "clear-since") {
+					try {
+						state.db = clearRecordedFriendsSince(state.db, uid)
+						updateRowFromDb(uid)
+						state.openEditorUserId = null
+					} catch (e) {
+						console.error(e)
+					}
+					return
+				}
+
+				if (action === "save-since") {
+					const cell = btn.closest("td")
+					const input = cell?.querySelector("input.sinceInput")
+					const v = input?.value || ""
+					const ms = localDateInputToMs(v)
+					if (!ms) return
+
+					try {
+						state.db = setManualFriendsSince(state.db, uid, ms)
+						updateRowFromDb(uid)
+						state.openEditorUserId = null
+					} catch (e) {
+						console.error(e)
+					}
+					return
+				}
+			})
 
 			el.connectBtn.addEventListener("click", async () => {
 				try {
 					await startOAuthLogin()
 				} catch (e) {
 					console.error(e)
-					setStatus("OAuth error")
-					setAuthUi(false, "error")
 				}
 			})
 

@@ -3,29 +3,6 @@ import { JFSC_OAUTH, JFSC_NET } from "./config.js"
 
 const TOKENS_KEY = "JFSC_OAUTH_TOKENS_v1"
 
-function isLikelyCorsError(e) {
-	const msg = String(e?.message || e || "")
-	// In browsers, CORS blocks commonly show up as TypeError + “Failed to fetch”
-	return (e instanceof TypeError) || /failed to fetch|networkerror|cors|blocked/i.test(msg)
-}
-
-async function tryWithFallback(makeUrl, fetchOpts, bases) {
-	let lastErr = null
-
-	for (const base of bases) {
-		if (!base) continue
-		try {
-			return await robloxFetch(makeUrl(normBase(base)), fetchOpts)
-		} catch (e) {
-			lastErr = e
-			// Only fall back if it smells like CORS/network. Otherwise, surface real errors immediately.
-			if (!isLikelyCorsError(e)) throw e
-		}
-	}
-
-	throw lastErr || new Error("Request failed (no base URLs available).")
-}
-
 function sleep(ms) {
 	return new Promise((r) => setTimeout(r, ms))
 }

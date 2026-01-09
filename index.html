@@ -5,7 +5,6 @@
 		<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 		<meta name="theme-color" content="#0b0f17">
 
-		<!-- iOS Add-to-Home-Screen / standalone -->
 		<meta name="apple-mobile-web-app-capable" content="yes">
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
@@ -25,7 +24,6 @@
 					</div>
 				</div>
 
-				<!-- Toolbar: scrolls on narrow screens + fades only when overflow exists -->
 				<div class="fadeWrap fadeScroll" id="toolbarFade">
 					<div class="toolbar hScroll" id="toolbarScroll">
 						<div class="pill" id="statusPill">Status: Not connected</div>
@@ -44,23 +42,21 @@
 
 					<div style="padding:14px;">
 						<div class="footer" style="margin-top:0;">
-							To read your friends list, you’ll authorize JFSC via Roblox OAuth.
-							This does <em>not</em> require cookies or any sketchy stuff.
+							Authorize JFSC via Roblox OAuth so it can read your friends list and start tracking “friends since.”
 						</div>
 
-						<div class="toolbar" style="justify-content:flex-start; margin-top:12px;">
+						<div class="toolbar" style="justify-content:flex-start; margin-top:12px; gap:10px; flex-wrap:wrap;">
 							<button id="connectBtn" type="button" style="padding:10px 12px; font-weight:800;">
 								Connect Roblox
 							</button>
 
-							<button id="demoBtn" type="button" class="smallBtn" title="Loads fake data locally (no OAuth).">
-								Demo
+							<button id="disconnectBtn" type="button" class="smallBtn" style="display:none;">
+								Disconnect
 							</button>
 						</div>
 
-						<div class="footer">
-							When OAuth is wired, this button will redirect to Roblox, then return to
-							<code class="inline">/pages/callback/</code>.
+						<div class="footer" id="authHint" style="margin-top:10px;">
+							Not connected. Click <span class="mono">Connect Roblox</span> to begin.
 						</div>
 					</div>
 				</section>
@@ -84,7 +80,7 @@
 								<tbody id="friendsBody">
 									<tr>
 										<td colspan="3" class="muted">
-											Not connected yet. Hit <span class="mono">Connect Roblox</span> (or Demo) to populate this list.
+											Not connected yet. Hit <span class="mono">Connect Roblox</span> to populate this list.
 										</td>
 									</tr>
 								</tbody>
@@ -142,25 +138,14 @@
 				authDot: document.getElementById("authDot"),
 				authTag: document.getElementById("authTag"),
 				statusPill: document.getElementById("statusPill"),
+				authHint: document.getElementById("authHint"),
+
 				friendsDot: document.getElementById("friendsDot"),
 				friendsTag: document.getElementById("friendsTag"),
 				friendsBody: document.getElementById("friendsBody"),
+
 				connectBtn: document.getElementById("connectBtn"),
-				demoBtn: document.getElementById("demoBtn"),
-			}
-
-			function setAuthUi(connected, label = "") {
-				el.authTag.textContent = connected ? "CONNECTED" : "DISCONNECTED"
-				el.statusPill.textContent = connected ? `Status: Connected${label ? ` (${label})` : ""}` : "Status: Not connected"
-
-				el.authDot.classList.toggle("off", !connected)
-				el.authDot.style.background = connected ? "var(--good)" : "var(--bad)"
-			}
-
-			function setFriendsUi(count, connected) {
-				el.friendsTag.textContent = String(count ?? 0)
-				el.friendsDot.classList.toggle("off", !connected)
-				el.friendsDot.style.background = connected ? "var(--good)" : "rgba(255,255,255,.55)"
+				disconnectBtn: document.getElementById("disconnectBtn"),
 			}
 
 			function escapeHtml(s) {
@@ -184,6 +169,41 @@
 						<td colspan="3" class="muted">${escapeHtml(text)}</td>
 					</tr>
 				`
+			}
+
+			function setConnectedButtons(connected) {
+				el.connectBtn.textContent = connected ? "Reconnect Roblox" : "Connect Roblox"
+				el.disconnectBtn.style.display = connected ? "" : "none"
+			}
+
+			function setAuthUi(connected, label = "") {
+				el.authTag.textContent = connected ? "CONNECTED" : "DISCONNECTED"
+				el.statusPill.textContent = connected
+					? `Status: Connected${label ? ` (${label})` : ""}`
+					: "Status: Not connected"
+
+				el.authDot.classList.toggle("off", !connected)
+				el.authDot.style.background = connected ? "var(--good)" : "var(--bad)"
+
+				el.authHint.textContent = connected
+					? "Connected. You can reconnect if something stops working, or disconnect to clear local tokens."
+					: "Not connected. Click Connect Roblox to begin."
+
+				setConnectedButtons(connected)
+			}
+
+			function setFriendsUi(count, connected) {
+				el.friendsTag.textContent = String(count ?? 0)
+				el.friendsDot.classList.toggle("off", !connected)
+				el.friendsDot.style.background = connected ? "var(--good)" : "rgba(255,255,255,.55)"
+			}
+
+			function describeFetchError(e) {
+				const status = e?.status ?? e?.code ?? null
+				if (status === 429) return "Rate limited by Roblox (HTTP 429). Try again in a bit."
+				if (status === 401 || status === 403) return `Authorization failed (HTTP ${status}). Try reconnecting.`
+				if (status) return `Endpoint error (HTTP ${status}).`
+				return "Rate limited or endpoint error."
 			}
 
 			function renderFriendsTable(friends, headshotMap, db) {
@@ -245,7 +265,10 @@
 			}
 
 			async function refreshFriends() {
-				if (!hasAccessToken()) {
+				const connected = hasAccessToken()
+				setConnectedButtons(connected)
+
+				if (!connected) {
 					setAuthUi(false)
 					setFriendsUi(0, false)
 					renderPlaceholder("Not connected yet. Hit Connect Roblox to populate this list.")
@@ -284,7 +307,7 @@
 				}
 				catch (e) {
 					setFriendsUi(0, false)
-					renderPlaceholder("Failed to fetch friends list (rate limit or endpoint error).")
+					renderPlaceholder(`Failed to fetch friends list. ${describeFetchError(e)}`)
 					console.error(e)
 					return
 				}
@@ -296,14 +319,12 @@
 
 				renderPlaceholder("Loading thumbnails…")
 
-				// Headshots: chunk to avoid URL size / server limits
 				for (const part of chunk(ids, 100)) {
 					try {
 						const m = await fetchAvatarHeadshots(part, { size: "48x48", isCircular: true })
 						for (const [k, v] of m.entries()) headshotMap.set(k, v)
 					}
 					catch (e) {
-						// Non-fatal
 						console.warn("Headshot fetch chunk failed:", e)
 					}
 				}
@@ -311,13 +332,11 @@
 				let db = loadDb()
 				db = ensureOwner(db, userId)
 
-				// Baseline capture happens automatically on first sync
 				syncFriends(db, ids)
 
 				setAuthUi(true, "Ready")
 				renderFriendsTable(friends, headshotMap, db)
 
-				// Clean URL params like ?signedIn=1
 				if (location.search) {
 					history.replaceState({}, "", location.pathname)
 				}
@@ -332,16 +351,15 @@
 				}
 			})
 
-			// Demo stays stubbed for now
-			el.demoBtn?.addEventListener("click", () => {
-				alert("Demo mode next. (No OAuth, fake friends list.)")
+			el.disconnectBtn?.addEventListener("click", () => {
+				clearStoredTokens()
+				setAuthUi(false)
+				setFriendsUi(0, false)
+				renderPlaceholder("Disconnected. Hit Connect Roblox to populate this list.")
 			})
 
-			// Auto-refresh on load if token exists
 			refreshFriends()
 
-			// Optional: easy dev sign-out from console:
-			// clearStoredTokens(); location.reload();
 			window.JFSC_DEV = {
 				signOut() {
 					clearStoredTokens()
@@ -349,6 +367,5 @@
 				}
 			}
 		</script>
-
 	</body>
 </html>

@@ -205,7 +205,7 @@
 				setStatus("Boot failed")
 				setAuthUi(false, "error")
 				setFriendsUi(0, "off")
-				renderPlaceholder(`App boot failed. Open console for details.`)
+				renderPlaceholder("App boot failed. Open console for details.")
 				throw e
 			}
 
@@ -221,6 +221,8 @@
 				loadDb,
 				ensureOwner,
 				syncFriends,
+				loadFriendsCache,
+				saveFriendsCache,
 				formatLocalDateTime,
 				formatDurationSince,
 			} = db
@@ -234,7 +236,7 @@
 				const now = Date.now()
 
 				const rows = friends.map((f) => {
-					const rec = dbState.friends[String(f.id)] || null
+					const rec = dbState?.friends?.[String(f.id)] || null
 					const friendsSinceMs = rec?.friendsSinceMs ?? null
 					const source = rec?.source ?? "not_recorded"
 
@@ -296,11 +298,31 @@
 					return
 				}
 
-				setStatus("Loading…")
-				setAuthUi(true, "loading")
-				setFriendsUi(0, "loading")
-				renderPlaceholder("Loading user…")
+				// 1) Try to show cached friends instantly (if available)
+				let dbState = null
+				let cached = null
 
+				try {
+					dbState = loadDb()
+					cached = loadFriendsCache(dbState)
+				} catch (e) {
+					console.warn("Local cache load failed:", e)
+				}
+
+				// If we have cache, show it immediately and refresh in background
+				if (cached && cached.friends.length){
+					setStatus("Updating…")
+					setAuthUi(true, "loading")
+					setFriendsUi(cached.friends.length, "loading")
+					renderFriendsTable(cached.friends, cached.headshotMap, dbState)
+				} else {
+					setStatus("Loading…")
+					setAuthUi(true, "loading")
+					setFriendsUi(0, "loading")
+					renderPlaceholder("Loading user…")
+				}
+
+				// 2) Fetch user info
 				let user
 				try {
 					user = await fetchUserInfo()
@@ -308,8 +330,14 @@
 					console.error(e)
 					setStatus("Auth failed")
 					setAuthUi(true, "error")
-					setFriendsUi(0, "off")
-					renderPlaceholder("Failed to load user info. Try reconnecting.")
+
+					// Keep cached view if we had one
+					if (cached && cached.friends.length){
+						setFriendsUi(cached.friends.length, "ok")
+					} else {
+						setFriendsUi(0, "off")
+						renderPlaceholder("Failed to load user info. Try reconnecting.")
+					}
 					return
 				}
 
@@ -317,25 +345,53 @@
 				if (!Number.isFinite(userId) || userId <= 0){
 					setStatus("Auth failed")
 					setAuthUi(true, "error")
-					setFriendsUi(0, "off")
-					renderPlaceholder("OAuth userinfo did not include a valid user id.")
+
+					if (cached && cached.friends.length){
+						setFriendsUi(cached.friends.length, "ok")
+					} else {
+						setFriendsUi(0, "off")
+						renderPlaceholder("OAuth userinfo did not include a valid user id.")
+					}
 					return
 				}
 
-				setStatus("Loading…")
+				// 3) Tie DB to correct owner (switching accounts resets DB)
+				let ownerMismatch = false
+				try {
+					const preOwner = dbState?.ownerUserId ?? null
+					dbState = ensureOwner(dbState || loadDb(), userId)
+					ownerMismatch = (preOwner != null && preOwner !== userId)
+				} catch (e) {
+					console.warn("DB ensureOwner failed:", e)
+					dbState = loadDb()
+				}
+
+				// If owner mismatch, cached view is potentially wrong — stop treating it as cache.
+				if (ownerMismatch){
+					cached = null
+					setFriendsUi(0, "loading")
+					renderPlaceholder("Loading friends list…")
+				}
+
+				// 4) Fetch friends list (live refresh)
+				setStatus("Updating…")
 				setAuthUi(true, "ok")
-				setFriendsUi(0, "loading")
-				renderPlaceholder("Loading friends list…")
 
 				let friends = []
 				try {
 					friends = await fetchAllFriends(userId, { pageLimit: 100, hardCap: 5000 })
 				} catch (e) {
 					console.error(e)
-					setStatus("Loading failed")
+					setStatus("Update failed")
 					setAuthUi(true, "ok")
-					setFriendsUi(0, "error")
-					renderPlaceholder("Failed to fetch friends list (rate limited or endpoint error).")
+
+					// Keep cached view if we had one
+					if (cached && cached.friends.length){
+						setFriendsUi(cached.friends.length, "ok")
+					} else {
+						setFriendsUi(0, "error")
+						renderPlaceholder("Failed to fetch friends list (rate limited or endpoint error).")
+					}
 					return
 				}
 
@@ -343,22 +399,31 @@
 				setAuthUi(true, "ok")
 				setFriendsUi(friends.length, "ok")
 
+				// 5) Headshots: start from cached headshots if present, then fill missing only
 				const ids = friends.map((f) => f.id)
-				const headshotMap = new Map()
+				const headshotMap = new Map(cached?.headshotMap ? cached.headshotMap : [])
 
-				renderPlaceholder("Loading thumbnails…")
-				for (const part of chunk(ids, 100)){
-					try {
-						const m = await fetchAvatarHeadshots(part, { size: "48x48", isCircular: true })
-						for (const [k, v] of m.entries()) headshotMap.set(k, v)
-					} catch (e) {
-						console.warn("Headshot fetch chunk failed:", e)
+				const missing = ids.filter((id) => !headshotMap.get(id))
+				if (missing.length){
+					if (!cached) renderPlaceholder("Loading thumbnails…")
+
+					for (const part of chunk(missing, 100)){
+						try {
+							const m = await fetchAvatarHeadshots(part, { size: "48x48", isCircular: true })
+							for (const [k, v] of m.entries()) headshotMap.set(k, v)
+						} catch (e) {
+							console.warn("Headshot fetch chunk failed:", e)
+						}
 					}
 				}
 
-				let dbState = loadDb()
-				dbState = ensureOwner(dbState, userId)
-				syncFriends(dbState, ids)
+				// 6) Sync and cache
+				try {
+					syncFriends(dbState, ids)
+					saveFriendsCache(dbState, friends, headshotMap)
+				} catch (e) {
+					console.warn("Sync/cache save failed:", e)
+				}
 
 				renderFriendsTable(friends, headshotMap, dbState)
 			}
@@ -368,6 +433,8 @@
 					await startOAuthLogin()
 				} catch (e) {
 					console.error(e)
+					setStatus("OAuth error")
+					setAuthUi(false, "error")
 				}
 			})
 

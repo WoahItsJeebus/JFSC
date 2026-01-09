@@ -27,6 +27,13 @@ export function makeEmptyDb() {
 		baselineCapturedMs: null,
 
 		friends: {}, // { [userId]: FriendRec }
+
+		// Cached "last known" friend list + thumbnails for instant load.
+		friendsCache: {
+			updatedAtMs: null,
+			friends: [],
+			headshots: {},
+		},
 	}
 }
 
@@ -40,6 +47,13 @@ export function loadDb() {
 	}
 
 	if (!("baselineCapturedMs" in db)) db.baselineCapturedMs = null
+	if (!("friendsCache" in db) || !isObj(db.friendsCache)) {
+		db.friendsCache = { updatedAtMs: null, friends: [], headshots: {} }
+	} else {
+		if (!("updatedAtMs" in db.friendsCache)) db.friendsCache.updatedAtMs = null
+		if (!Array.isArray(db.friendsCache.friends)) db.friendsCache.friends = []
+		if (!isObj(db.friendsCache.headshots)) db.friendsCache.headshots = {}
+	}
 	return db
 }
 
@@ -76,18 +90,9 @@ export function ensureOwner(db, ownerUserId) {
 	return db
 }
 
-/**
- * FriendRec:
- * {
- *		userId: number,
- *		firstSeenMs: number,
- *		lastSeenMs: number,
- *		friendsSinceMs: number|null,
- *		source: "not_recorded"|"observed"|"manual",
- * }
- */
+export function setRecordedFriendsSince(db, friendUserId, dateOrMs) {
+	if (!db || !isObj(db)) db = makeEmptyDb()
 
-export function setManualFriendsSince(db, friendUserId, dateOrMs) {
 	const uidNum = Number(friendUserId)
 	if (!Number.isFinite(uidNum) || uidNum <= 0) throw new Error("Invalid friendUserId")
 
@@ -117,10 +122,12 @@ export function setManualFriendsSince(db, friendUserId, dateOrMs) {
 }
 
 export function clearRecordedFriendsSince(db, friendUserId) {
+	if (!db || !isObj(db)) db = makeEmptyDb()
+
 	const uidNum = Number(friendUserId)
 	if (!Number.isFinite(uidNum) || uidNum <= 0) throw new Error("Invalid friendUserId")
-	const uid = String(uidNum)
 
+	const uid = String(uidNum)
 	const rec = db.friends[uid]
 	if (!rec) return db
 
@@ -161,8 +168,7 @@ export function syncFriends(db, friendUserIds, { now = nowMs() } = {}) {
 					source: "not_recorded",
 				}
 				added.push(idNum)
-			}
-			else {
+			} else {
 				db.friends[id].lastSeenMs = now
 				updated.push(idNum)
 			}
@@ -170,17 +176,15 @@ export function syncFriends(db, friendUserIds, { now = nowMs() } = {}) {
 
 		db.baselineCapturedMs = now
 		saveDb(db)
-
-		// Track removals (none meaningful on baseline)
 		return { db, added, updated, removed, baseline: true }
 	}
 
-	// Normal sync (after baseline)
+	// After baseline, new friends get observed timestamp
 	for (const idNum of ids) {
 		const id = String(idNum)
-		const prev = db.friends[id]
+		const rec = db.friends[id]
 
-		if (!prev) {
+		if (!rec) {
 			db.friends[id] = {
 				userId: idNum,
 				firstSeenMs: now,
@@ -192,18 +196,82 @@ export function syncFriends(db, friendUserIds, { now = nowMs() } = {}) {
 			continue
 		}
 
-		prev.lastSeenMs = now
-		updated.push(idNum)
+		rec.lastSeenMs = now
+
+		// If it was legacy/not_recorded, upgrade to observed if we have no timestamp
+		if (!rec.friendsSinceMs && rec.source !== "manual") {
+			rec.friendsSinceMs = now
+			rec.source = "observed"
+			updated.push(idNum)
+		}
 	}
 
-	for (const idStr of Object.keys(db.friends)) {
-		if (!seen.has(idStr)) {
-			removed.push(Number(idStr))
+	// Mark removals (optional bookkeeping)
+	for (const [k, rec] of Object.entries(db.friends || {})) {
+		const idNum = Number(rec?.userId || 0)
+		if (!Number.isFinite(idNum) || idNum <= 0) continue
+		if (!seen.has(String(idNum))) {
+			removed.push(idNum)
 		}
 	}
 
 	saveDb(db)
 	return { db, added, updated, removed, baseline: false }
+}
+
+export function loadFriendsCache(db) {
+	if (!db || !isObj(db)) db = loadDb()
+
+	const c = db?.friendsCache
+	if (!isObj(c) || !Array.isArray(c.friends) || !isObj(c.headshots)) return null
+
+	const updatedAtMs = Number(c.updatedAtMs || 0) || 0
+
+	const friends = c.friends
+		.map((f) => ({
+			id: Number(f?.id ?? 0),
+			name: String(f?.name ?? ""),
+			displayName: String(f?.displayName ?? ""),
+		}))
+		.filter((f) => Number.isFinite(f.id) && f.id > 0)
+
+	const headshotMap = new Map()
+	for (const [k, v] of Object.entries(c.headshots || {})) {
+		const id = Number(k)
+		if (Number.isFinite(id) && id > 0 && v) headshotMap.set(id, String(v))
+	}
+
+	if (!friends.length) return null
+	return { friends, headshotMap, updatedAtMs }
+}
+
+export function saveFriendsCache(db, friends, headshotMap, { now = nowMs() } = {}) {
+	if (!db || !isObj(db)) db = makeEmptyDb()
+
+	const normalizedFriends = (friends || [])
+		.map((f) => ({
+			id: Number(f?.id ?? 0),
+			name: String(f?.name ?? ""),
+			displayName: String(f?.displayName ?? ""),
+		}))
+		.filter((f) => Number.isFinite(f.id) && f.id > 0)
+
+	const headshots = {}
+	if (headshotMap && typeof headshotMap.entries === "function") {
+		for (const [id, url] of headshotMap.entries()) {
+			const n = Number(id)
+			if (Number.isFinite(n) && n > 0 && url) headshots[String(n)] = String(url)
+		}
+	}
+
+	db.friendsCache = {
+		updatedAtMs: now,
+		friends: normalizedFriends,
+		headshots,
+	}
+
+	saveDb(db)
+	return db
 }
 
 export function formatLocalDateTime(ms, {
@@ -229,28 +297,17 @@ export function formatLocalDateTime(ms, {
 
 export function formatDurationSince(ms, {
 	now = nowMs(),
-	maxParts = 2,
 } = {}) {
-	if (!Number.isFinite(ms) || ms <= 0) return "Not yet recorded"
-	const delta = Math.max(0, now - ms)
+	if (!Number.isFinite(ms) || ms <= 0) return "—"
+	const d = Math.max(0, now - ms)
 
-	const sec = Math.floor(delta / 1000)
+	const sec = Math.floor(d / 1000)
 	const min = Math.floor(sec / 60)
 	const hr = Math.floor(min / 60)
 	const day = Math.floor(hr / 24)
 
-	const years = Math.floor(day / 365)
-	const daysAfterYears = day - years * 365
-	const months = Math.floor(daysAfterYears / 30)
-	const daysAfterMonths = daysAfterYears - months * 30
-
-	const parts = []
-	if (years) parts.push(`${years}y`)
-	if (months) parts.push(`${months}mo`)
-	if (!years && !months && daysAfterMonths) parts.push(`${daysAfterMonths}d`)
-	if (!years && !months && !daysAfterMonths && hr) parts.push(`${hr}h`)
-	if (!years && !months && !daysAfterMonths && !hr && min) parts.push(`${min}m`)
-	if (!years && !months && !daysAfterMonths && !hr && !min) parts.push(`${sec}s`)
-
-	return parts.slice(0, maxParts).join(" ")
+	if (day > 0) return `${day}d ${hr % 24}h`
+	if (hr > 0) return `${hr}h ${min % 60}m`
+	if (min > 0) return `${min}m ${sec % 60}s`
+	return `${sec}s`
 }

@@ -316,6 +316,25 @@ a.platformLink:active{
 	white-space: nowrap;
 }
 
+/* Sortable headers */
+#friendsScroll thead th[data-sort]{
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#friendsScroll thead th[data-sort] .thArrow{
+  display: inline-block;
+  margin-left: 6px;
+  font-size: .55em; /* ~0.5x-ish */
+  opacity: .75;
+  transform: translateY(-1px);
+}
+
+#friendsScroll thead th[data-sort].isActive .thArrow{
+  opacity: .95;
+}
+
 /* Friend cell: avatar + text never stack */
 .friendCell{
 	display: flex;

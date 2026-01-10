@@ -309,20 +309,54 @@
 			}
 
 			function setHeaderSortIndicators(){
-				const ths = el.friendsScroll?.querySelectorAll("th[data-sort]") || document.querySelectorAll("#friendsScroll th[data-sort]")
+				const ths = document.querySelectorAll("#friendsScroll th[data-sort]")
 				for (const th of ths){
-					const k = th.dataset.sort
-					const base = th.dataset.baseText || th.textContent.trim()
-					th.dataset.baseText = base
+					const key = th.dataset.sort
+					const label = th.dataset.label || th.textContent.trim()
+					th.dataset.label = label
 
-					if (k === sortState.key){
-						const arrow = sortState.dir === "asc" ? " ▲" : " ▼"
-						th.textContent = base + arrow
-					} else {
-						th.textContent = base
-					}
+					const active = (key === sortState.key)
+					th.classList.toggle("isActive", active)
+
+					const arrow = active ? (sortState.dir === "asc" ? "▲" : "▼") : ""
+					th.innerHTML = `${escapeHtml(label)}<span class="thArrow" aria-hidden="true">${arrow}</span>`
 				}
 			}
+
+			(function initFriendsHeaderSorting(){
+			const thead = document.querySelector("#friendsScroll thead")
+			if (!thead) return
+
+			thead.addEventListener("mousedown", (ev) => {
+				const th = ev.target.closest("th[data-sort]")
+				if (th) ev.preventDefault()
+			})
+
+			thead.addEventListener("click", (ev) => {
+				const th = ev.target.closest("th[data-sort]")
+				if (!th) return
+
+				const key = th.dataset.sort
+
+				if (sortState.key === key){
+				sortState.dir = (sortState.dir === "asc") ? "desc" : "asc"
+				} else {
+				sortState.key = key
+				// defaults that feel right
+				if (key === "duration") sortState.dir = "desc" // longest first
+				else if (key === "since") sortState.dir = "asc" // earliest first
+				else sortState.dir = "asc"
+				}
+
+				// Re-render using current state
+				if (state.friends?.length){
+				renderFriendsTable(state.friends, state.headshotMap, state.db)
+				} else {
+				// still update arrows even if we have no rows yet
+				setHeaderSortIndicators()
+				}
+			})
+			})()
 
 			function updateConnectButtonLabel(){
 				el.connectBtn.textContent = hasAccessToken() ? "Reconnect Roblox" : "Connect Roblox"
@@ -753,6 +787,7 @@
 					// Re-render using current state
 					if (state.friends?.length){
 						renderFriendsTable(state.friends, state.headshotMap, state.db)
+						setStatusTemp(`Sorted: ${sortState.key} (${sortState.dir})`, 900)
 					}
 				})
 			}

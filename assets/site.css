@@ -307,7 +307,7 @@ a.platformLink:active{
 /* Make the friends table willing to overflow horizontally */
 #friendsScroll table{
 	width: max-content;
-	min-width: 860px; /* tweak to taste */
+	min-width: 100%;
 }
 
 /* Prefer scrolling over wrapping */

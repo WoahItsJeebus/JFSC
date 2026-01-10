@@ -384,7 +384,7 @@
 					const sinceText = sinceMs ? formatLocalDateTime(sinceMs) : "Not yet recorded"
 					sinceCell.innerHTML = `
 						<span class="sinceText" data-uid="${uid}" data-since-ms="${sinceMs || 0}">${escapeHtml(sinceText)}</span>
-						<button type="button" class="smallBtn" style="margin-top:8px;" data-action="edit-since" data-uid="${uid}" style="margin-left:8px; padding:6px 8px;">Edit</button>
+						<button type="button" class="smallBtn" data-action="edit-since" data-uid="${uid}" style="margin-left:8px; padding:6px 8px;">Edit</button>
 					`
 				}
 				tickDurations()
@@ -500,7 +500,7 @@
 							</td>
 							<td class="mono" data-cell="since" data-uid="${r.id}">
 								<span class="sinceText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(sinceText)}</span>
-								<button type="button" class="smallBtn" data-action="edit-since" data-uid="${r.id}" style="margin-left:8px; padding:6px 8px;">Edit</button>
+								<button type="button" class="smallBtn" data-action="edit-since" data-uid="${r.id}" style="margin-left:8px; margin-top:4px; padding:6px 8px;">Edit</button>
 							</td>
 							<td class="mono">
 								<span class="durText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(formatDurationSince(sinceMs, { now: Date.now() }))}</span>

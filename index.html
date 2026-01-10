@@ -84,11 +84,12 @@
 							<table>
 								<thead>
 									<tr>
-										<th style="width:52%">Friend</th>
-										<th style="width:24%">Friends Since</th>
-										<th style="width:24%">Duration</th>
+										<th style="width:52%; cursor:pointer;" data-sort="name">Friend</th>
+										<th style="width:24%; cursor:pointer;" data-sort="since">Friends Since</th>
+										<th style="width:24%; cursor:pointer;" data-sort="duration">Duration</th>
 									</tr>
 								</thead>
+
 								<tbody id="friendsBody">
 									<tr>
 										<td colspan="3" class="muted">
@@ -152,6 +153,7 @@
 				friendsDot: document.getElementById("friendsDot"),
 				friendsTag: document.getElementById("friendsTag"),
 				friendsBody: document.getElementById("friendsBody"),
+				friendsScroll: document.getElementById("friendsScroll"),
 
 				connectBtn: document.getElementById("connectBtn"),
 				disconnectBtn: document.getElementById("disconnectBtn"),
@@ -299,6 +301,27 @@
 				headshotMap: new Map(),
 				openEditorUserId: null,
 				durationTimer: null,
+			}
+			
+			const sortState = {
+				key: "since",	// "name" | "since" | "duration"
+				dir: "asc",		// "asc" | "desc"
+			}
+
+			function setHeaderSortIndicators(){
+				const ths = el.friendsScroll?.querySelectorAll("th[data-sort]") || document.querySelectorAll("#friendsScroll th[data-sort]")
+				for (const th of ths){
+					const k = th.dataset.sort
+					const base = th.dataset.baseText || th.textContent.trim()
+					th.dataset.baseText = base
+
+					if (k === sortState.key){
+						const arrow = sortState.dir === "asc" ? " ▲" : " ▼"
+						th.textContent = base + arrow
+					} else {
+						th.textContent = base
+					}
+				}
 			}
 
 			function updateConnectButtonLabel(){
@@ -453,12 +476,42 @@
 					}
 				})
 
+				function sortRank(ms){
+					// Not recorded goes last.
+					return ms ? 0 : 1
+				}
+
 				rows.sort((a, b) => {
-					const ar = a.friendsSinceMs ? 0 : 1
-					const br = b.friendsSinceMs ? 0 : 1
+					const dir = sortState.dir === "asc" ? 1 : -1
+
+					// Always push "Not yet recorded" to the bottom regardless of direction
+					const ar = sortRank(a.friendsSinceMs)
+					const br = sortRank(b.friendsSinceMs)
 					if (ar !== br) return ar - br
-					if (a.friendsSinceMs && b.friendsSinceMs) return a.friendsSinceMs - b.friendsSinceMs
-					return (a.displayName || a.name).localeCompare(b.displayName || b.name)
+
+					if (sortState.key === "name"){
+						const an = (a.displayName || a.name || `User ${a.id}`).toLowerCase()
+						const bn = (b.displayName || b.name || `User ${b.id}`).toLowerCase()
+						return an.localeCompare(bn) * dir
+					}
+
+					if (sortState.key === "since"){
+						// Earlier/later friends since
+						const av = a.friendsSinceMs || 0
+						const bv = b.friendsSinceMs || 0
+						return (av - bv) * dir
+					}
+
+					if (sortState.key === "duration"){
+						// Duration is essentially "how old is friendsSinceMs"
+						// Older sinceMs => longer duration.
+						const av = a.friendsSinceMs || 0
+						const bv = b.friendsSinceMs || 0
+						return (av - bv) * dir
+					}
+
+					// fallback
+					return 0
 				})
 
 				el.friendsBody.innerHTML = rows.map((r) => {
@@ -515,6 +568,7 @@
 					`
 				}).join("")
 
+				setHeaderSortIndicators()
 				startDurationTicker()
 			}
 
@@ -679,6 +733,28 @@
 				}
 
 				renderFriendsTable(friends, headshotMap, dbState)
+
+				document.querySelector("#friendsScroll thead")?.addEventListener("click", (ev) => {
+					const th = ev.target.closest("th[data-sort]")
+					if (!th) return
+
+					const key = th.dataset.sort
+
+					if (sortState.key === key){
+						sortState.dir = (sortState.dir === "asc") ? "desc" : "asc"
+					} else {
+						sortState.key = key
+						// sensible defaults per column:
+						if (key === "duration") sortState.dir = "desc" // longest first
+						else if (key === "since") sortState.dir = "asc" // earliest first
+						else sortState.dir = "asc"
+					}
+
+					// Re-render using current state
+					if (state.friends?.length){
+						renderFriendsTable(state.friends, state.headshotMap, state.db)
+					}
+				})
 			}
 
 			// Click handling: copy + editor buttons

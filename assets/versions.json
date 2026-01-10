@@ -63,6 +63,9 @@
 		],
 		"1.0.19": [
 			"Adjusted theme for better wrap handling."
+		],
+		"1.0.20": [
+			"Added sorting options for friends list."
 		]
 	}
 }

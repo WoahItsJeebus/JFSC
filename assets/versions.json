@@ -48,6 +48,9 @@
 			"Added import/export functionality for tracked friends list. Useful for backing up or transferring your list to another device.",
 			"Added username and UserId to tracked friends display for easier identification.",
 			"Clicking on a DisplayName, username, or UserId in the tracked friends list now copies that value to the clipboard for convenience."
+		],
+		"1.0.15": [
+			"Patched home index page to use new db structure."
 		]
 	}
 }

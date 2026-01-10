@@ -404,7 +404,7 @@
 				const v = sinceMs ? msToLocalDateInput(sinceMs) : ""
 
 				sinceCell.innerHTML = `
-					<div style="display:flex; gap:8px; align-items:center; width: max-content;">
+					<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
 						<input
 							type="date"
 							value="${escapeHtml(v)}"
@@ -476,7 +476,7 @@
 							<td>
 								${img}
 								<div style="display:inline-block; vertical-align:middle; width:max-content;">
-									<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+									<div style="display:flex; align-items:center; gap:8px;">
 										<span
 											data-copy-text="${escapeHtml(displayName)}"
 											title="Click to copy display name"

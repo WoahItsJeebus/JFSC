@@ -43,6 +43,11 @@
 		],
 		"1.0.13": [
 			"Fixed an issue where the friends list would not update correctly after fetching new data."
+		],
+		"1.0.14": [
+			"Added import/export functionality for tracked friends list. Useful for backing up or transferring your list to another device.",
+			"Added username and UserId to tracked friends display for easier identification.",
+			"Clicking on a DisplayName, username, or UserId in the tracked friends list now copies that value to the clipboard for convenience."
 		]
 	}
 }

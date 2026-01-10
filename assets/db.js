@@ -14,6 +14,15 @@ function isObj(v) {
 	return v && typeof v === "object"
 }
 
+function isFinitePosInt(n) {
+	return Number.isFinite(n) && n > 0
+}
+
+function toNum(v, fallback = 0) {
+	const n = Number(v)
+	return Number.isFinite(n) ? n : fallback
+}
+
 export function makeEmptyDb() {
 	const n = nowMs()
 	return {
@@ -212,7 +221,16 @@ export function syncFriends(db, friendUserIds, { now = nowMs() } = {}) {
 			continue
 		}
 
+		// Always mark last seen
 		prev.lastSeenMs = now
+
+		// If the record is baseline "not_recorded" but not manual, we can upgrade it to observed
+		// once we see it after baseline and it still has no timestamp recorded.
+		if (prev.source !== "manual" && (prev.friendsSinceMs == null || !Number.isFinite(prev.friendsSinceMs))) {
+			prev.friendsSinceMs = now
+			prev.source = "observed"
+		}
+
 		updated.push(idNum)
 	}
 
@@ -278,6 +296,183 @@ export function loadFriendsCache(db) {
 		friends,
 		headshotMap,
 	}
+}
+
+/**
+ * Export/Import helpers
+ *
+ * Export format:
+ * {
+ *		format: "JFSC_TRACK_EXPORT",
+ *		version: 1,
+ *		exportedAtMs: number,
+ *		ownerUserId: number|null,
+ *		baselineCapturedMs: number|null,
+ *		records: [
+ *			{ userId: number, friendsSinceMs: number, source: "manual"|"observed"|"not_recorded" }
+ *		]
+ * }
+ */
+
+export function exportTrackedData(db, {
+	manualOnly = false,
+} = {}) {
+	if (!db || !isObj(db)) db = loadDb()
+
+	const records = []
+	for (const [k, rec] of Object.entries(db.friends || {})) {
+		const userId = toNum(rec?.userId ?? k, 0)
+		const ms = toNum(rec?.friendsSinceMs ?? 0, 0)
+		const source = String(rec?.source ?? "not_recorded")
+
+		if (!isFinitePosInt(userId)) continue
+		if (!Number.isFinite(ms) || ms <= 0) continue
+
+		if (manualOnly && source !== "manual") continue
+
+		records.push({
+			userId,
+			friendsSinceMs: ms,
+			source: (source === "manual") ? "manual" : (source === "observed") ? "observed" : "not_recorded",
+		})
+	}
+
+	records.sort((a, b) => a.userId - b.userId)
+
+	return {
+		format: "JFSC_TRACK_EXPORT",
+		version: 1,
+		exportedAtMs: nowMs(),
+		ownerUserId: db.ownerUserId ?? null,
+		baselineCapturedMs: db.baselineCapturedMs ?? null,
+		records,
+	}
+}
+
+function parseImportPayload(payload) {
+	if (!payload) return []
+
+	// Case 1: preferred export format
+	if (isObj(payload) && Array.isArray(payload.records)) {
+		return payload.records
+	}
+
+	// Case 2: raw db dump compatibility (friends object)
+	if (isObj(payload) && isObj(payload.friends)) {
+		const out = []
+		for (const [k, rec] of Object.entries(payload.friends)) {
+			out.push({
+				userId: toNum(rec?.userId ?? k, 0),
+				friendsSinceMs: toNum(rec?.friendsSinceMs ?? 0, 0),
+				source: String(rec?.source ?? "observed"),
+			})
+		}
+		return out
+	}
+
+	return []
+}
+
+/**
+ * importTrackedData:
+ * - Only applies records where userId is present in allowedFriendIds (Set or array)
+ * - If incoming.source === "manual": ALWAYS override local (even if local manual)
+ * - If incoming is not manual: never overwrite local manual
+ * - Otherwise: apply only if local missing OR incoming earlier (useful restore)
+ *
+ * Returns:
+ * { db, applied, skippedNotFriend, skippedBad, skippedProtected }
+ */
+export function importTrackedData(db, payload, {
+	allowedFriendIds = null,		// Set<number> or number[]
+	manualOverrides = true,		// manual always wins
+} = {}) {
+	if (!db || !isObj(db)) db = loadDb()
+
+	let allowed = null
+	if (allowedFriendIds instanceof Set) {
+		allowed = allowedFriendIds
+	} else if (Array.isArray(allowedFriendIds)) {
+		allowed = new Set(allowedFriendIds.map(Number).filter((n) => isFinitePosInt(n)))
+	} else if (allowedFriendIds == null) {
+		// If not provided, treat as "no restriction" (caller should pass current friend IDs)
+		allowed = null
+	} else {
+		allowed = null
+	}
+
+	const incoming = parseImportPayload(payload)
+
+	let applied = 0
+	let skippedNotFriend = 0
+	let skippedBad = 0
+	let skippedProtected = 0
+
+	const n = nowMs()
+
+	for (const r of incoming) {
+		const userId = toNum(r?.userId ?? r?.id ?? 0, 0)
+		const ms = toNum(r?.friendsSinceMs ?? r?.sinceMs ?? 0, 0)
+		const src = String(r?.source ?? "observed")
+
+		if (!isFinitePosInt(userId) || !Number.isFinite(ms) || ms <= 0) {
+			skippedBad++
+			continue
+		}
+
+		if (allowed && !allowed.has(userId)) {
+			skippedNotFriend++
+			continue
+		}
+
+		const key = String(userId)
+		const local = db.friends[key] || null
+
+		// Manual import always overrides (requirement)
+		if (manualOverrides && src === "manual") {
+			const prev = local
+			db.friends[key] = {
+				userId,
+				firstSeenMs: prev?.firstSeenMs ?? n,
+				lastSeenMs: prev?.lastSeenMs ?? n,
+				friendsSinceMs: ms,
+				source: "manual",
+			}
+			applied++
+			continue
+		}
+
+		// Do not let non-manual overwrite local manual
+		if (local?.source === "manual") {
+			skippedProtected++
+			continue
+		}
+
+		// Apply if local missing or missing timestamp
+		if (!local || !Number.isFinite(local.friendsSinceMs) || !local.friendsSinceMs) {
+			db.friends[key] = {
+				userId,
+				firstSeenMs: local?.firstSeenMs ?? n,
+				lastSeenMs: n,
+				friendsSinceMs: ms,
+				source: (src === "not_recorded") ? "not_recorded" : "observed",
+			}
+			applied++
+			continue
+		}
+
+		// Apply if incoming is earlier (better data)
+		if (ms < Number(local.friendsSinceMs)) {
+			local.friendsSinceMs = ms
+			local.lastSeenMs = n
+			local.source = (src === "not_recorded") ? "not_recorded" : "observed"
+			applied++
+			continue
+		}
+	}
+
+	saveDb(db)
+	return { db, applied, skippedNotFriend, skippedBad, skippedProtected }
 }
 
 export function formatLocalDateTime(ms, {

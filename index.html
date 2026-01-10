@@ -53,6 +53,18 @@
 							<button id="disconnectBtn" type="button" class="smallBtn" style="display:none;">
 								Disconnect
 							</button>
+
+							<span style="flex:1;"></span>
+
+							<button id="exportBtn" type="button" class="smallBtn">
+								Export Data
+							</button>
+
+							<button id="importBtn" type="button" class="smallBtn">
+								Import Data
+							</button>
+
+							<input id="importFile" type="file" accept="application/json" style="display:none;">
 						</div>
 
 						<div class="footer" id="authHint" style="margin-top:10px;">
@@ -143,10 +155,29 @@
 
 				connectBtn: document.getElementById("connectBtn"),
 				disconnectBtn: document.getElementById("disconnectBtn"),
+
+				exportBtn: document.getElementById("exportBtn"),
+				importBtn: document.getElementById("importBtn"),
+				importFile: document.getElementById("importFile"),
+			}
+
+			const status = {
+				lastText: "Not connected",
+				timer: null,
 			}
 
 			function setStatus(text){
+				status.lastText = text
 				el.statusPill.textContent = `Status: ${text}`
+			}
+
+			function setStatusTemp(text, ms = 1800){
+				if (status.timer) clearTimeout(status.timer)
+				el.statusPill.textContent = `Status: ${text}`
+				status.timer = setTimeout(() => {
+					el.statusPill.textContent = `Status: ${status.lastText}`
+					status.timer = null
+				}, ms)
 			}
 
 			function setDotState(dotEl, state){
@@ -193,6 +224,36 @@
 				return out
 			}
 
+			async function copyToClipboard(text){
+				const t = String(text ?? "")
+				if (!t) return false
+
+				// Best path
+				try {
+					if (navigator.clipboard?.writeText){
+						await navigator.clipboard.writeText(t)
+						return true
+					}
+				} catch {}
+
+				// Fallback
+				try {
+					const ta = document.createElement("textarea")
+					ta.value = t
+					ta.setAttribute("readonly", "true")
+					ta.style.position = "fixed"
+					ta.style.left = "-9999px"
+					ta.style.top = "-9999px"
+					document.body.appendChild(ta)
+					ta.select()
+					const ok = document.execCommand("copy")
+					document.body.removeChild(ta)
+					return !!ok
+				} catch {}
+
+				return false
+			}
+
 			// Load the rest only if those modules are valid
 			let startOAuthLogin, api, db
 
@@ -205,7 +266,7 @@
 				setStatus("Boot failed")
 				setAuthUi(false, "error")
 				setFriendsUi(0, "off")
-				renderPlaceholder(`App boot failed. Open console for details.`)
+				renderPlaceholder("App boot failed. Open console for details.")
 				throw e
 			}
 
@@ -219,6 +280,7 @@
 
 			const {
 				loadDb,
+				saveDb,
 				ensureOwner,
 				syncFriends,
 				setManualFriendsSince,
@@ -317,9 +379,7 @@
 				if (badgeSpan){
 					badgeSpan.textContent = badge.label
 				}
-				// If we were in editor mode, restore the cell UI.
 				if (sinceCell && !sinceSpan){
-					// Rebuild the entire cell.
 					const sinceText = sinceMs ? formatLocalDateTime(sinceMs) : "Not yet recorded"
 					sinceCell.innerHTML = `
 						<span class="sinceText" data-uid="${uid}" data-since-ms="${sinceMs || 0}">${escapeHtml(sinceText)}</span>
@@ -401,7 +461,8 @@
 				})
 
 				el.friendsBody.innerHTML = rows.map((r) => {
-					const title = r.displayName || r.name || `User ${r.id}`
+					const displayName = r.displayName || r.name || `User ${r.id}`
+					const username = r.name ? `@${r.name}` : "@—"
 					const sinceText = r.friendsSinceMs ? formatLocalDateTime(r.friendsSinceMs) : "Not yet recorded"
 					const sinceMs = r.friendsSinceMs || 0
 
@@ -413,19 +474,194 @@
 						<tr>
 							<td>
 								${img}
-								<span style="font-weight:800;">${escapeHtml(title)}</span>
-								<span class="tag badgeTag" data-uid="${r.id}" style="margin-left:8px;">${escapeHtml(r.badge.label)}</span>
+								<div style="display:inline-block; vertical-align:middle;">
+									<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+										<span
+											data-copy-text="${escapeHtml(displayName)}"
+											title="Click to copy display name"
+											style="font-weight:800; cursor:pointer;"
+										>${escapeHtml(displayName)}</span>
+										<span class="tag badgeTag" data-uid="${r.id}">${escapeHtml(r.badge.label)}</span>
+									</div>
+									<div class="muted" style="margin-top:2px; font-size:12px; opacity:.78;">
+										<span
+											data-copy-text="${escapeHtml(username)}"
+											title="Click to copy username"
+											style="cursor:pointer;"
+										>${escapeHtml(username)}</span>
+										<span
+											data-copy-text="${escapeHtml(String(r.id))}"
+											title="Click to copy user id"
+											style="cursor:pointer;"
+										> (${escapeHtml(String(r.id))})</span>
+									</div>
+								</div>
 							</td>
 							<td class="mono" data-cell="since" data-uid="${r.id}">
 								<span class="sinceText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(sinceText)}</span>
 								<button type="button" class="smallBtn" data-action="edit-since" data-uid="${r.id}" style="margin-left:8px; padding:6px 8px;">Edit</button>
 							</td>
-							<td class="mono"><span class="durText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(formatDurationSince(sinceMs, { now: Date.now() }))}</span></td>
+							<td class="mono">
+								<span class="durText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(formatDurationSince(sinceMs, { now: Date.now() }))}</span>
+							</td>
 						</tr>
 					`
 				}).join("")
 
 				startDurationTicker()
+			}
+
+			function buildExportPayload(){
+				const d = state.db || loadDb()
+				const records = []
+
+				for (const [k, rec] of Object.entries(d.friends || {})){
+					const userId = Number(rec?.userId ?? k)
+					const friendsSinceMs = Number(rec?.friendsSinceMs ?? 0)
+					const source = String(rec?.source ?? "not_recorded")
+
+					if (!Number.isFinite(userId) || userId <= 0) continue
+					if (!Number.isFinite(friendsSinceMs) || friendsSinceMs <= 0) continue
+
+					records.push({
+						userId,
+						friendsSinceMs,
+						source,
+					})
+				}
+
+				records.sort((a, b) => a.userId - b.userId)
+
+				return {
+					format: "JFSC_TRACK_EXPORT",
+					version: 1,
+					exportedAtMs: Date.now(),
+					ownerUserId: d.ownerUserId ?? null,
+					baselineCapturedMs: d.baselineCapturedMs ?? null,
+					records,
+				}
+			}
+
+			function downloadJson(filename, obj){
+				const txt = JSON.stringify(obj, null, 2)
+				const blob = new Blob([txt], { type: "application/json" })
+				const url = URL.createObjectURL(blob)
+
+				const a = document.createElement("a")
+				a.href = url
+				a.download = filename
+				document.body.appendChild(a)
+				a.click()
+				document.body.removeChild(a)
+
+				setTimeout(() => URL.revokeObjectURL(url), 2500)
+			}
+
+			function extractImportRecords(payload){
+				if (!payload || typeof payload !== "object") return []
+				// expected:
+				// { format:"JFSC_TRACK_EXPORT", version:1, records:[{userId,friendsSinceMs,source}] }
+				if (Array.isArray(payload.records)) return payload.records
+				// fallback support:
+				// { friends: { "123": { friendsSinceMs, source } } }
+				if (payload.friends && typeof payload.friends === "object"){
+					const out = []
+					for (const [k, v] of Object.entries(payload.friends)){
+						out.push({
+							userId: Number(v?.userId ?? k),
+							friendsSinceMs: Number(v?.friendsSinceMs ?? 0),
+							source: String(v?.source ?? "observed"),
+						})
+					}
+					return out
+				}
+				return []
+			}
+
+			function applyImport(payload){
+				if (!state.userId || !state.friends?.length){
+					setStatusTemp("Import requires a loaded friends list (Connect first).", 3200)
+					return
+				}
+
+				const allowed = new Set(state.friends.map((f) => Number(f.id)).filter((n) => Number.isFinite(n) && n > 0))
+				const incoming = extractImportRecords(payload)
+
+				if (!incoming.length){
+					setStatusTemp("Import file had no usable records.", 2600)
+					return
+				}
+
+				let applied = 0
+				let skippedNotFriend = 0
+				let skippedBad = 0
+				let skippedProtected = 0
+
+				state.db = state.db || loadDb()
+
+				for (const r of incoming){
+					const uid = Number(r?.userId ?? r?.id ?? 0)
+					const ms = Number(r?.friendsSinceMs ?? r?.sinceMs ?? 0)
+					const src = String(r?.source ?? "observed")
+
+					if (!Number.isFinite(uid) || uid <= 0) { skippedBad++; continue }
+					if (!Number.isFinite(ms) || ms <= 0) { skippedBad++; continue }
+
+					if (!allowed.has(uid)){
+						skippedNotFriend++
+						continue
+					}
+
+					const local = state.db?.friends?.[String(uid)] || null
+
+					// Manual import ALWAYS overrides (requirement).
+					if (src === "manual"){
+						try {
+							state.db = setManualFriendsSince(state.db, uid, ms)
+							applied++
+						} catch {
+							skippedBad++
+						}
+						continue
+					}
+
+					// Imported observed/legacy must NOT overwrite local manual.
+					if (local?.source === "manual"){
+						skippedProtected++
+						continue
+					}
+
+					// Only apply if local is missing OR import is earlier (useful for restore/backup).
+					if (!local?.friendsSinceMs || ms < Number(local.friendsSinceMs)){
+						const now = Date.now()
+						const id = String(uid)
+						const prev = state.db.friends?.[id] || {
+							userId: uid,
+							firstSeenMs: now,
+							lastSeenMs: now,
+							friendsSinceMs: null,
+							source: "observed",
+						}
+
+						prev.userId = uid
+						prev.firstSeenMs = Number(prev.firstSeenMs || now)
+						prev.lastSeenMs = now
+						prev.friendsSinceMs = ms
+						prev.source = (src === "not_recorded") ? "not_recorded" : "observed"
+
+						state.db.friends[id] = prev
+						state.db = saveDb(state.db)
+						applied++
+					}
+				}
+
+				// Update cached list snapshot after import (optional but helpful).
+				if (typeof saveFriendsCache === "function"){
+					try { saveFriendsCache(state.db, state.friends, state.headshotMap) } catch {}
+				}
+
+				renderFriendsTable(state.friends, state.headshotMap, state.db)
+				setStatusTemp(`Imported ${applied}. Skipped ${skippedNotFriend} not-friends, ${skippedProtected} manual-protected, ${skippedBad} invalid.`, 4200)
 			}
 
 			async function refreshFriends(){
@@ -439,7 +675,7 @@
 					return
 				}
 
-				// Try to show cached friends instantly (if supported)
+				// Try to show cached friends instantly
 				state.db = null
 				state.userId = null
 				state.friends = []
@@ -529,6 +765,7 @@
 				let dbState = state.db || loadDb()
 				dbState = ensureOwner(dbState, userId)
 				syncFriends(dbState, ids)
+
 				state.db = dbState
 				state.userId = userId
 				state.friends = friends
@@ -541,9 +778,22 @@
 				renderFriendsTable(friends, headshotMap, dbState)
 			}
 
-			el.friendsBody.addEventListener("click", (ev) => {
+			// Click handling: copy + editor buttons
+			el.friendsBody.addEventListener("click", async (ev) => {
+				// Copy behavior (displayName / @username / (id))
+				const copyEl = ev.target.closest("[data-copy-text]")
+				if (copyEl && !ev.target.closest("button")){
+					const text = copyEl.dataset.copyText || ""
+					const ok = await copyToClipboard(text)
+					if (ok) setStatusTemp(`Copied: ${text}`, 1400)
+					else setStatusTemp("Copy failed (browser blocked).", 1800)
+					return
+				}
+
+				// Editor buttons
 				const btn = ev.target.closest("button[data-action]")
 				if (!btn) return
+
 				const action = btn.dataset.action
 				const uid = Number(btn.dataset.uid || 0)
 				if (!Number.isFinite(uid) || uid <= 0) return
@@ -584,6 +834,32 @@
 						console.error(e)
 					}
 					return
+				}
+			})
+
+			el.exportBtn.addEventListener("click", () => {
+				const payload = buildExportPayload()
+				const d = new Date()
+				const stamp = `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`
+				downloadJson(`JFSC_TrackedData_${stamp}.json`, payload)
+				setStatusTemp("Exported JSON file.", 1800)
+			})
+
+			el.importBtn.addEventListener("click", () => {
+				el.importFile.value = ""
+				el.importFile.click()
+			})
+
+			el.importFile.addEventListener("change", async () => {
+				const f = el.importFile.files?.[0]
+				if (!f) return
+				try {
+					const txt = await f.text()
+					const payload = JSON.parse(txt)
+					applyImport(payload)
+				} catch (e) {
+					console.error(e)
+					setStatusTemp("Import failed (invalid JSON).", 2600)
 				}
 			})
 

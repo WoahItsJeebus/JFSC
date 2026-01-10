@@ -475,7 +475,7 @@
 						<tr>
 							<td>
 								${img}
-								<div style="display:inline-block; vertical-align:middle;">
+								<div style="display:inline-block; vertical-align:middle; width:max-content;">
 									<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
 										<span
 											data-copy-text="${escapeHtml(displayName)}"
@@ -498,13 +498,13 @@
 									</div>
 								</div>
 							</td>
-							<td class="mono" data-cell="since" data-uid="${r.id}" style="min-width:380px;">
+							<td class="mono" data-cell="since" data-uid="${r.id}" style="width:max-content;">
 								<div>
 									<span class="sinceText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(sinceText)}</span>
-									<button type="button" class="smallBtn" data-action="edit-since" data-uid="${r.id}" style="margin-left:4px; margin-top:4px; padding:6px 8px;">✏</button>
+									<button type="button" class="smallBtn" data-action="edit-since" data-uid="${r.id}" style="margin-left:4px; padding:6px 8px;">✏</button>
 								</div>
 							</td>
-							<td class="mono">
+							<td class="mono" style="width:max-content;">
 								<span class="durText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(formatDurationSince(sinceMs, { now: Date.now() }))}</span>
 							</td>
 						</tr>

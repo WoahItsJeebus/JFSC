@@ -85,8 +85,8 @@
 								<thead>
 									<tr>
 										<th style="width:52%; cursor:pointer;" data-sort="name">Friend</th>
-										<th style="width:24%; cursor:pointer;" data-sort="since">Friends Since</th>
 										<th style="width:24%; cursor:pointer;" data-sort="duration">Duration</th>
+										<th style="width:24%; cursor:pointer;" data-sort="since">Friends Since</th>
 									</tr>
 								</thead>
 
@@ -588,15 +588,15 @@
 									</div>
 								</div>
 							</td>
-
+							
+							<td class="mono" style="width:max-content;">
+								<span class="durText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(formatDurationSince(sinceMs, { now: Date.now() }))}</span>
+							</td>
 							<td class="mono" data-cell="since" data-uid="${r.id}" style="width:max-content;">
 								<div>
 									<span class="sinceText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(sinceText)}</span>
 									<button type="button" class="smallBtn" data-action="edit-since" data-uid="${r.id}" style="margin-left:4px; padding:6px 8px;">✏</button>
 								</div>
-							</td>
-							<td class="mono" style="width:max-content;">
-								<span class="durText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(formatDurationSince(sinceMs, { now: Date.now() }))}</span>
 							</td>
 						</tr>
 					`

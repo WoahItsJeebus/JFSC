@@ -66,6 +66,9 @@
 		],
 		"1.0.20": [
 			"Added sorting options for friends list."
+		],
+		"1.0.21": [
+			"Reordered friends list columns to have duration before since."
 		]
 	}
 }

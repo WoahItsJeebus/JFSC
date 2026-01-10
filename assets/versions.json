@@ -57,6 +57,9 @@
 		],
 		"1.0.17": [
 			"Adjusted padding for edit button on since column."
+		],
+		"1.0.18": [
+			"Increased min-width for friends since column for better visibility."
 		]
 	}
 }

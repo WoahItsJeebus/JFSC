@@ -60,6 +60,9 @@
 		],
 		"1.0.18": [
 			"Increased min-width for friends since column for better visibility."
+		],
+		"1.0.19": [
+			"Adjusted theme for better wrap handling."
 		]
 	}
 }

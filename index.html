@@ -468,36 +468,40 @@
 					const sinceMs = r.friendsSinceMs || 0
 
 					const img = r.img
-						? `<img src="${escapeHtml(r.img)}" alt="" style="width:28px;height:28px;border-radius:999px;vertical-align:middle;margin-right:10px;box-shadow:0 0 0 1px rgba(255,255,255,.12);">`
-						: `<span style="display:inline-block;width:28px;height:28px;border-radius:999px;vertical-align:middle;margin-right:10px;background:rgba(255,255,255,.06);box-shadow:0 0 0 1px rgba(255,255,255,.10);"></span>`
+						? `<img class="friendAvatar" src="${escapeHtml(r.img)}" alt="">`
+						: `<span class="friendAvatar ph"></span>`
 
 					return `
 						<tr>
-							<td>
+							<td class="friendCell">
 								${img}
-								<div style="display:inline-block; vertical-align:middle; width:max-content;">
-									<div style="display:flex; align-items:center; gap:8px; width:max-content;">
+								<div class="friendMeta">
+									<div class="friendTop">
 										<span
 											data-copy-text="${escapeHtml(displayName)}"
 											title="Click to copy display name"
-											style="font-weight:800; cursor:pointer;"
+											class="friendDisplay"
 										>${escapeHtml(displayName)}</span>
+
 										<span class="tag badgeTag" data-uid="${r.id}">${escapeHtml(r.badge.label)}</span>
 									</div>
-									<div class="muted" style="margin-top:2px; font-size:12px; opacity:.78;">
+
+									<div class="friendSub">
 										<span
 											data-copy-text="${escapeHtml(username)}"
 											title="Click to copy username"
-											style="cursor:pointer;"
+											class="friendCopy"
 										>${escapeHtml(username)}</span>
+
 										<span
 											data-copy-text="${escapeHtml(String(r.id))}"
 											title="Click to copy user id"
-											style="cursor:pointer;"
+											class="friendCopy"
 										> (${escapeHtml(String(r.id))})</span>
 									</div>
 								</div>
 							</td>
+
 							<td class="mono" data-cell="since" data-uid="${r.id}" style="width:max-content;">
 								<div>
 									<span class="sinceText" data-uid="${r.id}" data-since-ms="${sinceMs}">${escapeHtml(sinceText)}</span>

@@ -304,6 +304,73 @@ a.platformLink:active{
   image-rendering: auto;
 }
 
+/* Make the friends table willing to overflow horizontally */
+#friendsScroll table{
+	width: max-content;
+	min-width: 860px; /* tweak to taste */
+}
+
+/* Prefer scrolling over wrapping */
+#friendsScroll th,
+#friendsScroll td{
+	white-space: nowrap;
+}
+
+/* Friend cell: avatar + text never stack */
+.friendCell{
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: nowrap;
+}
+
+/* Avatar should never shrink */
+.friendAvatar{
+	flex: 0 0 auto;
+	width: 28px;
+	height: 28px;
+	border-radius: 999px;
+	box-shadow: 0 0 0 1px rgba(255,255,255,.12);
+}
+
+.friendAvatar.ph{
+	background: rgba(255,255,255,.06);
+	box-shadow: 0 0 0 1px rgba(255,255,255,.10);
+}
+
+/* The text block also should not shrink into wrapping */
+.friendMeta{
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 0 0 auto;
+}
+
+.friendTop{
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: nowrap;
+}
+
+.friendSub{
+	display: flex;
+	gap: 6px;
+	flex-wrap: nowrap;
+	font-size: 12px;
+	opacity: .78;
+}
+
+.friendDisplay{
+	font-weight: 800;
+	cursor: pointer;
+}
+
+.friendCopy{
+	cursor: pointer;
+}
+
+
 /* ============================================================
    Horizontal scroll + conditional fade edges
    ============================================================ */

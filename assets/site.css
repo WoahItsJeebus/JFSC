@@ -876,27 +876,28 @@ input[type="range"]{
 
 .rnControls{
 	display:flex;
-	gap:10px;
+	gap:8px;
 	flex-wrap:wrap;
 	align-items:center;
 	margin-bottom:20px;
 }
 
 .rnLabel{
-  	min-width:40px;
+  	/* min-width:40px; */
+	width: max-content;
 }
 
 .selectWrap{
 	position:relative;
 	flex:1;
-	min-width:80px;
+	/* min-width:340px; */
 	opacity:1;
 }
 
 .selectWrap::after{
 	content:"";
 	position:absolute;
-	right:14px;
+	right: 10px;
 	top:50%;
 	width:6px;
 	height:6px;
@@ -905,11 +906,13 @@ input[type="range"]{
 	border-bottom:2px solid var(--muted);
 	pointer-events:none;
 	opacity:1;
+	background: transparent;
 }
 
 .selectWrap select{
 	width:100%;
-	padding:2px 40px 2px 12px;
+	min-width:80px;
+	padding:2px 0 2px 12px;
 	border-radius:14px;
 	border:1px solid var(--stroke);
 	background: rgba(255,255,255,.06);

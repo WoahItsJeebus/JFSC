@@ -384,7 +384,7 @@
 					const sinceText = sinceMs ? formatLocalDateTime(sinceMs) : "Not yet recorded"
 					sinceCell.innerHTML = `
 						<span class="sinceText" data-uid="${uid}" data-since-ms="${sinceMs || 0}">${escapeHtml(sinceText)}</span>
-						<button type="button" class="smallBtn" data-action="edit-since" data-uid="${uid}" style="margin-left:8px; padding:6px 8px;">Edit</button>
+						<button type="button" class="smallBtn" data-action="edit-since" data-uid="${uid}" style="margin-left:8px; padding:6px 12px;">Edit</button>
 					`
 				}
 				tickDurations()

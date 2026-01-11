@@ -73,5 +73,10 @@
 		"1.0.22": [
 			"Added shortcut icon."
 		]
+	},
+	"1.1": {
+		"1.1.0": [
+			"Added player profile page to view your own profile data."
+		]
 	}
 }

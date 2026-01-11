@@ -37,6 +37,12 @@ export function makeEmptyDb() {
 
 		friends: {}, // { [userId]: FriendRec }
 
+		// Tracked deltas since baselineCapturedMs
+		trackingStats: {
+			friendsGained: 0,
+			friendsLost: 0,
+		},
+
 		// Cached "last known" friend list + thumbnails for instant load.
 		friendsCache: {
 			updatedAtMs: null,
@@ -55,7 +61,15 @@ export function loadDb() {
 		return makeEmptyDb()
 	}
 
-	if (!("baselineCapturedMs" in db)) db.baselineCapturedMs = null
+	if \(!\("baselineCapturedMs" in db\)\) db\.baselineCapturedMs = null
+
+	// Backfill trackingStats
+	if (!("trackingStats" in db) || !isObj(db.trackingStats)) {
+		db.trackingStats = { friendsGained: 0, friendsLost: 0 }
+	} else {
+		if (!("friendsGained" in db.trackingStats)) db.trackingStats.friendsGained = 0
+		if (!("friendsLost" in db.trackingStats)) db.trackingStats.friendsLost = 0
+	}
 
 	// Backfill cache structure
 	if (!("friendsCache" in db) || !isObj(db.friendsCache)) {
@@ -66,7 +80,15 @@ export function loadDb() {
 		if (!isObj(db.friendsCache.headshots)) db.friendsCache.headshots = {}
 	}
 
-	return db
+		// Backfill isFriend flags on friend records (default true)
+	for (const [k, rec] of Object.entries(db.friends || {})) {
+		if (!isObj(rec)) continue
+		if (!("isFriend" in rec)) rec.isFriend = true
+		if (!("source" in rec)) rec.source = "observed"
+		if (!("userId" in rec)) rec.userId = toNum(k, 0)
+	}
+
+return db
 }
 
 export function saveDb(db) {
@@ -110,6 +132,7 @@ export function ensureOwner(db, ownerUserId) {
  *		lastSeenMs: number,
  *		friendsSinceMs: number|null,
  *		source: "not_recorded"|"observed"|"manual",
+ *		isFriend: boolean,
  * }
  */
 
@@ -137,6 +160,7 @@ export function setManualFriendsSince(db, friendUserId, dateOrMs) {
 		lastSeenMs: prev?.lastSeenMs ?? n,
 		friendsSinceMs: ms,
 		source: "manual",
+		isFriend: true,
 	}
 
 	return saveDb(db)
@@ -188,11 +212,13 @@ export function syncFriends(db, friendUserIds, { now = nowMs() } = {}) {
 					lastSeenMs: now,
 					friendsSinceMs: null,
 					source: "not_recorded",
+					isFriend: true,
 				}
 				added.push(idNum)
 			}
 			else {
 				db.friends[id].lastSeenMs = now
+				db.friends[id].isFriend = true
 				updated.push(idNum)
 			}
 		}
@@ -210,12 +236,14 @@ export function syncFriends(db, friendUserIds, { now = nowMs() } = {}) {
 		const prev = db.friends[id]
 
 		if (!prev) {
+			if (db.trackingStats) db.trackingStats.friendsGained = toNum(db.trackingStats.friendsGained, 0) + 1
 			db.friends[id] = {
 				userId: idNum,
 				firstSeenMs: now,
 				lastSeenMs: now,
 				friendsSinceMs: now,
 				source: "observed",
+				isFriend: true,
 			}
 			added.push(idNum)
 			continue
@@ -223,6 +251,15 @@ export function syncFriends(db, friendUserIds, { now = nowMs() } = {}) {
 
 		// Always mark last seen
 		prev.lastSeenMs = now
+
+		// Transition: if they were previously lost but are now present again, count as gained
+		if (prev.isFriend === false) {
+			prev.isFriend = true
+			if (db.trackingStats) db.trackingStats.friendsGained = toNum(db.trackingStats.friendsGained, 0) + 1
+		}
+		else {
+			prev.isFriend = true
+		}
 
 		// If the record is baseline "not_recorded" but not manual, we can upgrade it to observed
 		// once we see it after baseline and it still has no timestamp recorded.
@@ -236,7 +273,13 @@ export function syncFriends(db, friendUserIds, { now = nowMs() } = {}) {
 
 	for (const idStr of Object.keys(db.friends)) {
 		if (!seen.has(idStr)) {
-			removed.push(Number(idStr))
+			const rec = db.friends[idStr]
+			// Only count a loss once: when we transition from present -> absent
+			if (rec && rec.isFriend !== false) {
+				rec.isFriend = false
+				if (db.trackingStats) db.trackingStats.friendsLost = toNum(db.trackingStats.friendsLost, 0) + 1
+				removed.push(Number(idStr))
+			}
 		}
 	}
 
@@ -345,6 +388,10 @@ export function exportTrackedData(db, {
 		exportedAtMs: nowMs(),
 		ownerUserId: db.ownerUserId ?? null,
 		baselineCapturedMs: db.baselineCapturedMs ?? null,
+		trackingStats: {
+			friendsGained: toNum(db.trackingStats?.friendsGained ?? 0, 0),
+			friendsLost: toNum(db.trackingStats?.friendsLost ?? 0, 0),
+		},
 		records,
 	}
 }
@@ -403,6 +450,15 @@ export function importTrackedData(db, payload, {
 
 	const incoming = parseImportPayload(payload)
 
+	// Optional: restore trackingStats if present
+	if (isObj(payload) && isObj(payload.trackingStats)) {
+		const g = toNum(payload.trackingStats.friendsGained ?? 0, 0)
+		const l = toNum(payload.trackingStats.friendsLost ?? 0, 0)
+		if (!isObj(db.trackingStats)) db.trackingStats = { friendsGained: 0, friendsLost: 0 }
+		db.trackingStats.friendsGained = g
+		db.trackingStats.friendsLost = l
+	}
+
 	let applied = 0
 	let skippedNotFriend = 0
 	let skippedBad = 0
@@ -437,6 +493,7 @@ export function importTrackedData(db, payload, {
 				lastSeenMs: prev?.lastSeenMs ?? n,
 				friendsSinceMs: ms,
 				source: "manual",
+				isFriend: true,
 			}
 			applied++
 			continue
@@ -456,6 +513,7 @@ export function importTrackedData(db, payload, {
 				lastSeenMs: n,
 				friendsSinceMs: ms,
 				source: (src === "not_recorded") ? "not_recorded" : "observed",
+				isFriend: true,
 			}
 			applied++
 			continue

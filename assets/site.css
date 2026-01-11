@@ -165,6 +165,68 @@ button:active{ transform:translateY(1px); }
   color:var(--muted);
   font-family:var(--mono);
   white-space:nowrap;
+
+.headRight{
+	display:flex;
+	align-items:center;
+	gap:8px;
+	flex-wrap:wrap;
+	justify-content:flex-end;
+}
+
+/* Owner card layout */
+.accountRow{
+	display:flex;
+	gap:14px;
+	align-items:flex-start;
+	flex-wrap:wrap;
+}
+
+.accountLeft{
+	flex:0 0 auto;
+}
+
+.ownerAvatar{
+	flex: 0 0 auto;
+	width: 64px;
+	height: 64px;
+	border-radius: 16px;
+	box-shadow: 0 0 0 1px rgba(255,255,255,.12);
+	background: rgba(255,255,255,.06);
+}
+
+.ownerAvatar.ph{
+	display:inline-block;
+}
+
+.accountMeta{
+	flex:1 1 260px;
+	display:grid;
+	gap:8px;
+	min-width: 220px;
+}
+
+.accountLine{
+	display:flex;
+	align-items:baseline;
+	justify-content:space-between;
+	gap:12px;
+	flex-wrap:wrap;
+	padding-bottom:6px;
+	border-bottom:1px dashed rgba(255,255,255,.08);
+}
+
+.accountLine:last-child{
+	border-bottom:none;
+	padding-bottom:0;
+}
+
+.accountLabel{
+	font-size:12px;
+	font-weight:800;
+	letter-spacing:.2px;
+	color: var(--muted);
+}
 }
 
 table{ width:100%; border-collapse:collapse; }

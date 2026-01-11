@@ -10,7 +10,6 @@
  *
  */
 
-
 let __orbBgStop = null;
 
 export function startOrbBackground(opts = {}) {

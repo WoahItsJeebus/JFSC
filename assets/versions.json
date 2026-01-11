@@ -72,11 +72,9 @@
 		],
 		"1.0.22": [
 			"Added shortcut icon."
-		]
-	},
-	"1.1": {
-		"1.1.0": [
-			"Added player profile page to view your own profile data."
+		],
+		"1.0.23": [
+			"Reverted player profile update (1.1.0) due to API changes causing critical issues."
 		]
 	}
 }

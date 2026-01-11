@@ -29,7 +29,6 @@
 					<div class="toolbar hScroll" id="toolbarScroll">
 						<div class="pill" id="statusPill">Status: Not connected</div>
 						<div class="pill" id="storagePill">Storage: Local</div>
-						<div class="pill" id="trackingPill">Tracking Since: —</div>
 						<div class="pill" id="tzPill">Local TZ: —</div>
 					</div>
 				</div>
@@ -74,60 +73,11 @@
 						</div>
 					</div>
 				</section>
-				<section class="card span2" id="ownerCard">
-					<div class="head">
-						<div class="title"><span class="statusDot off" id="ownerDot"></span>Your Account</div>
-						<div class="tag" id="ownerTag">—</div>
-					</div>
-
-					<div style="padding:14px;">
-						<div class="accountRow">
-							<div class="accountLeft">
-								<img id="ownerThumb" class="ownerAvatar" alt="" style="display:none;">
-								<span id="ownerThumbPh" class="ownerAvatar ph"></span>
-							</div>
-
-							<div class="accountMeta">
-								<div class="accountLine">
-									<span class="accountLabel">DisplayName</span>
-									<span class="mono" id="ownerDisplayName">—</span>
-								</div>
-								<div class="accountLine">
-									<span class="accountLabel">Username</span>
-									<span class="mono" id="ownerUsername">—</span>
-								</div>
-								<div class="accountLine">
-									<span class="accountLabel">UserID</span>
-									<span class="mono" id="ownerUserId">—</span>
-								</div>
-								<div class="accountLine">
-									<span class="accountLabel">Friends</span>
-									<span class="mono" id="ownerFriendsCount">—</span>
-								</div>
-								<div class="accountLine">
-									<span class="accountLabel">Friends gained since tracking</span>
-									<span class="mono" id="ownerFriendsGained">—</span>
-								</div>
-								<div class="accountLine">
-									<span class="accountLabel">Friends lost since tracking</span>
-									<span class="mono" id="ownerFriendsLost">—</span>
-								</div>
-							</div>
-						</div>
-
-						<div class="footer" id="ownerHint" style="margin-top:12px;">
-							Connect Roblox to load your account details.
-						</div>
-					</div>
-				</section>
 
 				<section class="card span2">
 					<div class="head">
 						<div class="title"><span class="statusDot off" id="friendsDot"></span>Tracked Friends</div>
-						<div class="headRight">
-							<div class="tag" id="friendsUpdatedTag">Last Updated: —</div>
-							<div class="tag" id="friendsTag">0</div>
-						</div>
+						<div class="tag" id="friendsTag">0</div>
 					</div>
 
 					<div class="fadeWrap fadeScroll" id="friendsFade">
@@ -212,22 +162,6 @@
 				exportBtn: document.getElementById("exportBtn"),
 				importBtn: document.getElementById("importBtn"),
 				importFile: document.getElementById("importFile"),
-
-				trackingPill: document.getElementById("trackingPill"),
-
-				ownerDot: document.getElementById("ownerDot"),
-				ownerTag: document.getElementById("ownerTag"),
-				ownerThumb: document.getElementById("ownerThumb"),
-				ownerThumbPh: document.getElementById("ownerThumbPh"),
-				ownerDisplayName: document.getElementById("ownerDisplayName"),
-				ownerUsername: document.getElementById("ownerUsername"),
-				ownerUserId: document.getElementById("ownerUserId"),
-				ownerFriendsCount: document.getElementById("ownerFriendsCount"),
-				ownerFriendsGained: document.getElementById("ownerFriendsGained"),
-				ownerFriendsLost: document.getElementById("ownerFriendsLost"),
-				ownerHint: document.getElementById("ownerHint"),
-
-				friendsUpdatedTag: document.getElementById("friendsUpdatedTag"),
 			}
 
 			const status = {
@@ -268,88 +202,6 @@
 			function setFriendsUi(count, state){
 				el.friendsTag.textContent = String(count ?? 0)
 				setDotState(el.friendsDot, state)
-			}
-
-			function setTrackingPill(ms, formatter){
-				const txt = (ms && Number.isFinite(ms) && ms > 0)
-					? (formatter ? formatter(ms) : new Date(ms).toLocaleString())
-					: "—"
-				el.trackingPill.textContent = `Tracking Since: ${txt}`
-			}
-
-			function setFriendsUpdatedTag(ms, formatter){
-				const txt = (ms && Number.isFinite(ms) && ms > 0)
-					? (formatter ? formatter(ms) : new Date(ms).toLocaleString())
-					: "—"
-				el.friendsUpdatedTag.textContent = `Last Updated: ${txt}`
-			}
-
-			async function fetchOwnerProfile(userId){
-				const uid = Number(userId)
-				if (!Number.isFinite(uid) || uid <= 0) throw new Error("Invalid userId for owner profile")
-
-				// Username + DisplayName
-				const userRes = await fetch(`https://users.roblox.com/v1/users/${uid}`, { method: "GET" })
-				if (!userRes.ok) throw new Error(`users.roblox.com failed: ${userRes.status}`)
-				const u = await userRes.json()
-
-				// Friends count
-				let friendsCount = null
-				try {
-					const cRes = await fetch(`https://friends.roblox.com/v1/users/${uid}/friends/count`, { method: "GET" })
-					if (cRes.ok){
-						const c = await cRes.json()
-						friendsCount = Number(c?.count ?? 0)
-						if (!Number.isFinite(friendsCount)) friendsCount = null
-					}
-				} catch {}
-
-				return {
-					userId: uid,
-					name: String(u?.name || ""),
-					displayName: String(u?.displayName || ""),
-					friendsCount,
-				}
-			}
-
-			function setOwnerUi({ connected, state, profile = null, headshotUrl = "", friendsCount = null, gained = null, lost = null } = {}){
-				setDotState(el.ownerDot, connected ? state : "off")
-				el.ownerTag.textContent = connected ? "CONNECTED" : "DISCONNECTED"
-
-				if (!connected){
-					el.ownerHint.textContent = "Connect Roblox to load your account details."
-					el.ownerDisplayName.textContent = "—"
-					el.ownerUsername.textContent = "—"
-					el.ownerUserId.textContent = "—"
-					el.ownerFriendsCount.textContent = "—"
-					el.ownerFriendsGained.textContent = "—"
-					el.ownerFriendsLost.textContent = "—"
-					el.ownerThumb.style.display = "none"
-					el.ownerThumbPh.style.display = ""
-					el.ownerThumb.removeAttribute("src")
-					return
-				}
-
-				el.ownerHint.textContent = "Your account stats are based on this device’s local tracking DB."
-				el.ownerDisplayName.textContent = profile?.displayName || "—"
-				el.ownerUsername.textContent = profile?.name ? `@${profile.name}` : "—"
-				el.ownerUserId.textContent = profile?.userId ? String(profile.userId) : "—"
-
-				const fc = (friendsCount != null) ? friendsCount : (profile?.friendsCount ?? null)
-				el.ownerFriendsCount.textContent = (Number.isFinite(fc)) ? String(fc) : "—"
-
-				el.ownerFriendsGained.textContent = (Number.isFinite(gained)) ? String(gained) : "0"
-				el.ownerFriendsLost.textContent = (Number.isFinite(lost)) ? String(lost) : "0"
-
-				if (headshotUrl){
-					el.ownerThumb.src = headshotUrl
-					el.ownerThumb.style.display = ""
-					el.ownerThumbPh.style.display = "none"
-				} else {
-					el.ownerThumb.style.display = "none"
-					el.ownerThumbPh.style.display = ""
-					el.ownerThumb.removeAttribute("src")
-				}
 			}
 
 			function escapeHtml(s){
@@ -798,19 +650,6 @@
 
 				renderFriendsTable(state.friends, state.headshotMap, state.db)
 
-				try {
-					setTrackingPill(state.db?.baselineCapturedMs ?? null, formatLocalDateTime)
-					setOwnerUi({
-						connected: true,
-						state: "ok",
-						profile: { userId: state.userId, name: "", displayName: "" },
-						headshotUrl: "",
-						friendsCount: state.friends.length,
-						gained: state.db?.trackingStats?.friendsGained ?? 0,
-						lost: state.db?.trackingStats?.friendsLost ?? 0,
-					})
-				} catch {}
-
 				setStatusTemp(
 					`Imported ${res.applied}. Skipped ${res.skippedNotFriend} not-friends, ${res.skippedProtected} manual-protected, ${res.skippedBad} invalid.`,
 					4200
@@ -824,9 +663,6 @@
 					setStatus("Not connected")
 					setAuthUi(false, "off")
 					setFriendsUi(0, "off")
-					setOwnerUi({ connected: false })
-					setTrackingPill(null)
-					setFriendsUpdatedTag(null)
 					renderPlaceholder("Not connected yet. Hit Connect Roblox to populate this list.")
 					return
 				}
@@ -845,13 +681,6 @@
 				} catch (e) {
 					console.warn("Local cache load failed:", e)
 				}
-
-				try {
-					setFriendsUpdatedTag(cached?.updatedAtMs ?? null, formatLocalDateTime)
-					setTrackingPill(state.db?.baselineCapturedMs ?? null, formatLocalDateTime)
-				} catch {}
-
-				setOwnerUi({ connected: true, state: "loading" })
 
 				if (cached && cached.friends?.length) {
 					setStatus("Updating…")
@@ -874,7 +703,6 @@
 					setAuthUi(true, "error")
 					setFriendsUi(0, "off")
 					renderPlaceholder("Failed to load user info. Try reconnecting.")
-					setOwnerUi({ connected: true, state: "error" })
 					return
 				}
 
@@ -887,25 +715,7 @@
 					return
 				}
 
-				
-				// Load owner profile (public endpoints) + headshot
-				let ownerProfile = null
-				let ownerHeadshot = ""
-				try {
-					ownerProfile = await fetchOwnerProfile(userId)
-				} catch (e) {
-					console.warn("Owner profile fetch failed:", e)
-					ownerProfile = { userId, name: "", displayName: "" }
-				}
-
-				try {
-					const m = await fetchAvatarHeadshots([userId], { size: "150x150", isCircular: true })
-					ownerHeadshot = m.get(userId) || ""
-				} catch (e) {
-					console.warn("Owner headshot fetch failed:", e)
-				}
-
-setStatus("Updating…")
+				setStatus("Updating…")
 				setAuthUi(true, "ok")
 				if (!cached || !cached.friends?.length){
 					setFriendsUi(0, "loading")
@@ -921,7 +731,6 @@ setStatus("Updating…")
 					setAuthUi(true, "ok")
 					setFriendsUi(0, "error")
 					renderPlaceholder("Failed to fetch friends list (rate limited or endpoint error).")
-					setOwnerUi({ connected: true, state: "error", profile: ownerProfile, headshotUrl: ownerHeadshot })
 					return
 				}
 
@@ -948,19 +757,6 @@ setStatus("Updating…")
 				let dbState = state.db || loadDb()
 				dbState = ensureOwner(dbState, userId)
 				syncFriends(dbState, ids)
-
-				// Update top pills + account panel
-				setTrackingPill(dbState?.baselineCapturedMs ?? null, formatLocalDateTime)
-				setFriendsUpdatedTag(Date.now(), formatLocalDateTime)
-				setOwnerUi({
-					connected: true,
-					state: "ok",
-					profile: ownerProfile,
-					headshotUrl: ownerHeadshot,
-					friendsCount: friends.length,
-					gained: dbState?.trackingStats?.friendsGained ?? 0,
-					lost: dbState?.trackingStats?.friendsLost ?? 0,
-				})
 
 				state.db = dbState
 				state.userId = userId
@@ -1100,9 +896,6 @@ setStatus("Updating…")
 				setAuthUi(false, "off")
 				setFriendsUi(0, "off")
 				renderPlaceholder("Disconnected. Hit Connect Roblox to populate this list.")
-				setOwnerUi({ connected: false })
-				setTrackingPill(null)
-				setFriendsUpdatedTag(null)
 			})
 
 			updateConnectButtonLabel()

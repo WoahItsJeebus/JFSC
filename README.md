@@ -1,3 +1,5 @@
+<font face="Tahoma, Geneva, Fredoka One, sans-serif">
+
 # [Jeebus' Friends Since Checker for Roblox (JFSC)](https://woahitsjeebus.github.io/JFSC/)
 
 JFSC is a web application that allows Roblox users to check how long they have been friends with other users on the platform. It provides a simple interface to view and manage friendship durations. The application is built using HTML, CSS, and JavaScript, and it leverages the Roblox API to fetch friendship data.
@@ -16,3 +18,5 @@ Roblox does not track "Friends Since" dates. You may edit your friends' "Friends
 ---
 
 #### <i><b>Check it out [here](https://woahitsjeebus.github.io/JFSC/)!</b></i>
+
+</font>

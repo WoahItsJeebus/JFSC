@@ -305,8 +305,8 @@
 			}
 			
 			const sortState = {
-				key: "since",	// "name" | "since" | "duration"
-				dir: "asc",		// "asc" | "desc"
+				key: "since",		// "name" | "since" | "duration"
+				dir: "desc",		// "asc" | "desc"
 			}
 
 			function setHeaderSortIndicators(){
@@ -340,13 +340,13 @@
 				const key = th.dataset.sort
 
 				if (sortState.key === key){
-				sortState.dir = (sortState.dir === "asc") ? "desc" : "asc"
+					sortState.dir = (sortState.dir === "asc") ? "desc" : "asc"
 				} else {
-				sortState.key = key
-				// defaults that feel right
-				if (key === "duration") sortState.dir = "desc" // longest first
-				else if (key === "since") sortState.dir = "asc" // earliest first
-				else sortState.dir = "asc"
+					sortState.key = key
+					// defaults that feel right
+					if (key === "duration") sortState.dir = "desc" // longest first
+					else if (key === "since") sortState.dir = "asc" // earliest first
+					else sortState.dir = "asc"
 				}
 
 				// Re-render using current state

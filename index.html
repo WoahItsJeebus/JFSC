@@ -225,6 +225,25 @@
 				document.getElementById("removedFade")
 			)
 
+			// Retry failed avatar loads with backoff, then fall back to placeholder
+			window.retryAvatarLoad = function(img){
+				const attempt = parseInt(img.dataset.retry || "0", 10)
+				const maxRetries = 4
+				if (attempt >= maxRetries){
+					const ph = document.createElement("span")
+					ph.className = "friendAvatar ph"
+					img.replaceWith(ph)
+					return
+				}
+				img.dataset.retry = String(attempt + 1)
+				const delay = 800 * Math.pow(2, attempt) // 800, 1600, 3200, 6400
+				setTimeout(() => {
+					const src = img.src
+					img.src = ""
+					img.src = src
+				}, delay)
+			}
+
 			const el = {
 				authDot: document.getElementById("authDot"),
 				authTag: document.getElementById("authTag"),
@@ -662,7 +681,7 @@
 					const sinceMs = r.friendsSinceMs || 0
 
 					const img = r.img
-						? `<img class="friendAvatar" src="${escapeHtml(r.img)}" alt="">`
+						? `<img class="friendAvatar" src="${escapeHtml(r.img)}" alt="" data-retry="0" onerror="retryAvatarLoad(this)">`
 						: `<span class="friendAvatar ph"></span>`
 
 					return `
@@ -1035,7 +1054,7 @@
 					const profileUrl = `https://www.roblox.com/users/${encodeURIComponent(r.userId)}/profile`
 
 					const img = r.headshotUrl
-						? `<img class="friendAvatar" src="${escapeHtml(r.headshotUrl)}" alt="">`
+						? `<img class="friendAvatar" src="${escapeHtml(r.headshotUrl)}" alt="" data-retry="0" onerror="retryAvatarLoad(this)">`
 						: `<span class="friendAvatar ph"></span>`
 
 					return `

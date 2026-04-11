@@ -2,7 +2,7 @@
    site.js — shared helpers for all pages
    ============================================================ */
    
-   export const JSTC_VERSION = "1.0.24";
+   export const JSTC_VERSION = "1.0.24a";
    
 /**
  *

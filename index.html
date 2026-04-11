@@ -104,6 +104,81 @@
 				</section>
 			</div>
 
+			<div class="grid" style="margin-top:14px;">
+				<section class="card span2">
+					<div class="head">
+						<div class="title"><span class="statusDot off" id="removedDot"></span>Removed Friends</div>
+						<div style="display:flex; align-items:center; gap:8px;">
+							<div class="tag" id="removedTag">0</div>
+							<button type="button" class="addRemovedBtn" id="addRemovedBtn" title="Add removed friend">+</button>
+						</div>
+					</div>
+
+					<div class="fadeWrap fadeScroll" id="removedFade">
+						<div class="tableScroll" id="removedScroll" style="width:100%;">
+							<table>
+								<thead>
+									<tr>
+										<th style="width:52%;">Friend</th>
+										<th style="width:24%;">Removed</th>
+										<th style="width:24%;">Actions</th>
+									</tr>
+								</thead>
+								<tbody id="removedBody">
+									<tr>
+										<td colspan="3" class="muted">
+											No removed friends tracked yet. Click <span class="mono">+</span> to add one.
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</section>
+			</div>
+
+			<!-- Add Removed Friend popup -->
+			<div class="popoverOverlay" id="removedPopoverOverlay">
+				<div class="popoverCard">
+					<div class="head">
+						<div class="title">Add Removed Friend</div>
+						<button type="button" class="smallBtn" id="removedPopoverClose" style="padding:6px 10px;">✕</button>
+					</div>
+					<div class="popoverBody">
+						<div class="field">
+							<label class="label" for="removedUserIdInput">User ID</label>
+							<div style="display:flex; gap:8px; align-items:center;">
+								<input type="text" id="removedUserIdInput" placeholder="e.g. 1234567" style="flex:1;" />
+								<button type="button" class="smallBtn" id="removedLookupBtn" style="font-weight:800; padding:8px 14px;">Lookup</button>
+							</div>
+						</div>
+
+						<div id="removedLookupResult" style="display:none; margin-top:12px;">
+							<div class="removedPreviewCard">
+								<img class="removedPreviewAvatar" id="removedPreviewImg" src="" alt="" />
+								<div class="removedPreviewMeta">
+									<div style="font-weight:800;" id="removedPreviewDisplay">—</div>
+									<div class="muted" style="font-size:12px;" id="removedPreviewUsername">@—</div>
+									<a class="inlineLink" id="removedPreviewLink" href="#" target="_blank" rel="noopener" style="margin-top:4px; font-size:11px;">View Profile</a>
+								</div>
+							</div>
+						</div>
+
+						<div id="removedLookupError" class="muted" style="display:none; margin-top:10px; color:var(--bad);"></div>
+
+						<div class="field" style="margin-top:12px;">
+							<label class="label" for="removedDateInput">Removed Date <span class="muted" style="font-weight:400;">(optional)</span></label>
+							<input type="date" id="removedDateInput" style="width:180px;" />
+						</div>
+
+						<div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
+							<button type="button" class="smallBtn" id="removedPopoverCancel" style="padding:8px 14px;">Cancel</button>
+							<button type="button" class="smallBtn" id="removedPopoverSave" style="font-weight:800; padding:8px 14px;" disabled>Add Friend</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
 			<div class="footer">
 				<code class="inline" id="versionCode">v—</code>
 			</div>
@@ -145,6 +220,11 @@
 				document.getElementById("friendsFade")
 			)
 
+			attachFadeToScroller(
+				document.getElementById("removedScroll"),
+				document.getElementById("removedFade")
+			)
+
 			const el = {
 				authDot: document.getElementById("authDot"),
 				authTag: document.getElementById("authTag"),
@@ -162,6 +242,26 @@
 				exportBtn: document.getElementById("exportBtn"),
 				importBtn: document.getElementById("importBtn"),
 				importFile: document.getElementById("importFile"),
+
+				removedDot: document.getElementById("removedDot"),
+				removedTag: document.getElementById("removedTag"),
+				removedBody: document.getElementById("removedBody"),
+				removedScroll: document.getElementById("removedScroll"),
+				addRemovedBtn: document.getElementById("addRemovedBtn"),
+
+				removedOverlay: document.getElementById("removedPopoverOverlay"),
+				removedPopoverClose: document.getElementById("removedPopoverClose"),
+				removedPopoverCancel: document.getElementById("removedPopoverCancel"),
+				removedPopoverSave: document.getElementById("removedPopoverSave"),
+				removedUserIdInput: document.getElementById("removedUserIdInput"),
+				removedLookupBtn: document.getElementById("removedLookupBtn"),
+				removedLookupResult: document.getElementById("removedLookupResult"),
+				removedLookupError: document.getElementById("removedLookupError"),
+				removedPreviewImg: document.getElementById("removedPreviewImg"),
+				removedPreviewDisplay: document.getElementById("removedPreviewDisplay"),
+				removedPreviewUsername: document.getElementById("removedPreviewUsername"),
+				removedPreviewLink: document.getElementById("removedPreviewLink"),
+				removedDateInput: document.getElementById("removedDateInput"),
 			}
 
 			const status = {
@@ -275,6 +375,7 @@
 				fetchUserInfo,
 				fetchAllFriends,
 				fetchAvatarHeadshots,
+				fetchUserById,
 				hasAccessToken,
 				clearStoredTokens,
 			} = api
@@ -289,6 +390,11 @@
 				formatDurationSince,
 				loadFriendsCache,
 				saveFriendsCache,
+
+				// Removed friends helpers
+				addRemovedFriend,
+				deleteRemovedFriend,
+				getRemovedFriends,
 
 				// NEW db helpers
 				exportTrackedData,
@@ -897,6 +1003,205 @@
 				setFriendsUi(0, "off")
 				renderPlaceholder("Disconnected. Hit Connect Roblox to populate this list.")
 			})
+
+			// ===== Removed Friends Section =====
+
+			const removedPopover = {
+				lookedUpUser: null, // { userId, username, displayName, headshotUrl }
+			}
+
+			function renderRemovedFriends(){
+				const dbState = state.db || loadDb()
+				const list = getRemovedFriends(dbState)
+
+				el.removedTag.textContent = String(list.length)
+				setDotState(el.removedDot, list.length ? "ok" : "off")
+
+				if (!list.length){
+					el.removedBody.innerHTML = `
+						<tr>
+							<td colspan="3" class="muted">
+								No removed friends tracked yet. Click <span class="mono">+</span> to add one.
+							</td>
+						</tr>
+					`
+					return
+				}
+
+				el.removedBody.innerHTML = list.map((r) => {
+					const displayName = r.displayName || r.username || `User ${r.userId}`
+					const username = r.username ? `@${r.username}` : "@—"
+					const removedText = r.removedAtMs ? formatLocalDateTime(r.removedAtMs) : "Unknown"
+					const profileUrl = `https://www.roblox.com/users/${encodeURIComponent(r.userId)}/profile`
+
+					const img = r.headshotUrl
+						? `<img class="friendAvatar" src="${escapeHtml(r.headshotUrl)}" alt="">`
+						: `<span class="friendAvatar ph"></span>`
+
+					return `
+						<tr>
+							<td class="friendCell">
+								${img}
+								<div class="friendMeta">
+									<div class="friendTop">
+										<a href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener"
+											class="friendDisplay" style="text-decoration:none; color:var(--text);"
+											title="View profile on Roblox"
+										>${escapeHtml(displayName)}</a>
+									</div>
+									<div class="friendSub">
+										<span
+											data-copy-text="${escapeHtml(username)}"
+											title="Click to copy username"
+											class="friendCopy"
+										>${escapeHtml(username)}</span>
+										<span
+											data-copy-text="${escapeHtml(String(r.userId))}"
+											title="Click to copy user id"
+											class="friendCopy"
+										> (${escapeHtml(String(r.userId))})</span>
+									</div>
+								</div>
+							</td>
+							<td class="mono">${escapeHtml(removedText)}</td>
+							<td>
+								<button type="button" class="smallBtn" data-action="delete-removed" data-uid="${r.userId}" style="padding:6px 10px;">Remove</button>
+							</td>
+						</tr>
+					`
+				}).join("")
+			}
+
+			el.removedBody.addEventListener("click", async (ev) => {
+				const copyEl = ev.target.closest("[data-copy-text]")
+				if (copyEl && !ev.target.closest("button")){
+					const text = copyEl.dataset.copyText || ""
+					const ok = await copyToClipboard(text)
+					if (ok) setStatusTemp(`Copied: ${text}`, 1400)
+					return
+				}
+
+				const btn = ev.target.closest("button[data-action]")
+				if (!btn) return
+				const action = btn.dataset.action
+				const uid = Number(btn.dataset.uid || 0)
+				if (!Number.isFinite(uid) || uid <= 0) return
+
+				if (action === "delete-removed"){
+					state.db = deleteRemovedFriend(state.db || loadDb(), uid)
+					renderRemovedFriends()
+					setStatusTemp("Removed entry deleted.", 1400)
+				}
+			})
+
+			// Popup open/close
+			function openRemovedPopover(){
+				removedPopover.lookedUpUser = null
+				el.removedUserIdInput.value = ""
+				el.removedDateInput.value = ""
+				el.removedLookupResult.style.display = "none"
+				el.removedLookupError.style.display = "none"
+				el.removedPopoverSave.disabled = true
+				el.removedOverlay.classList.add("open")
+				el.removedUserIdInput.focus()
+			}
+
+			function closeRemovedPopover(){
+				el.removedOverlay.classList.remove("open")
+				removedPopover.lookedUpUser = null
+			}
+
+			el.addRemovedBtn.addEventListener("click", openRemovedPopover)
+			el.removedPopoverClose.addEventListener("click", closeRemovedPopover)
+			el.removedPopoverCancel.addEventListener("click", closeRemovedPopover)
+			el.removedOverlay.addEventListener("click", (ev) => {
+				if (ev.target === el.removedOverlay) closeRemovedPopover()
+			})
+
+			// Lookup
+			el.removedLookupBtn.addEventListener("click", async () => {
+				const raw = el.removedUserIdInput.value.trim()
+				const userId = Number(raw)
+				if (!Number.isFinite(userId) || userId <= 0){
+					el.removedLookupError.textContent = "Please enter a valid numeric User ID."
+					el.removedLookupError.style.display = ""
+					el.removedLookupResult.style.display = "none"
+					el.removedPopoverSave.disabled = true
+					removedPopover.lookedUpUser = null
+					return
+				}
+
+				el.removedLookupError.style.display = "none"
+				el.removedLookupResult.style.display = "none"
+				el.removedLookupBtn.disabled = true
+				el.removedLookupBtn.textContent = "…"
+
+				try {
+					const user = await fetchUserById(userId)
+					const username = String(user?.name || "")
+					const displayName = String(user?.displayName || username || `User ${userId}`)
+
+					let headshotUrl = ""
+					try {
+						const hsMap = await fetchAvatarHeadshots([userId], { size: "48x48", isCircular: true })
+						headshotUrl = hsMap.get(userId) || ""
+					} catch {}
+
+					removedPopover.lookedUpUser = { userId, username, displayName, headshotUrl }
+
+					el.removedPreviewImg.src = headshotUrl || ""
+					el.removedPreviewImg.style.display = headshotUrl ? "" : "none"
+					el.removedPreviewDisplay.textContent = displayName
+					el.removedPreviewUsername.textContent = username ? `@${username}` : "@—"
+					el.removedPreviewLink.href = `https://www.roblox.com/users/${encodeURIComponent(userId)}/profile`
+					el.removedLookupResult.style.display = ""
+					el.removedPopoverSave.disabled = false
+				} catch (e) {
+					console.error(e)
+					el.removedLookupError.textContent = `Lookup failed: ${e?.message || "Unknown error"}`
+					el.removedLookupError.style.display = ""
+					el.removedPopoverSave.disabled = true
+					removedPopover.lookedUpUser = null
+				} finally {
+					el.removedLookupBtn.disabled = false
+					el.removedLookupBtn.textContent = "Lookup"
+				}
+			})
+
+			el.removedUserIdInput.addEventListener("keydown", (ev) => {
+				if (ev.key === "Enter") el.removedLookupBtn.click()
+			})
+
+			// Save
+			el.removedPopoverSave.addEventListener("click", () => {
+				const u = removedPopover.lookedUpUser
+				if (!u) return
+
+				const dateVal = el.removedDateInput.value || ""
+				let removedAtMs = null
+				if (dateVal){
+					const ms = localDateInputToMs(dateVal)
+					if (ms) removedAtMs = ms
+				}
+
+				state.db = addRemovedFriend(state.db || loadDb(), {
+					userId: u.userId,
+					username: u.username,
+					displayName: u.displayName,
+					headshotUrl: u.headshotUrl,
+					removedAtMs,
+				})
+
+				renderRemovedFriends()
+				closeRemovedPopover()
+				setStatusTemp("Removed friend added.", 1600)
+			})
+
+			// Render removed friends on boot
+			try {
+				state.db = state.db || loadDb()
+				renderRemovedFriends()
+			} catch {}
 
 			updateConnectButtonLabel()
 			refreshFriends()

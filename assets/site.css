@@ -1029,3 +1029,104 @@ input[type="range"]{
 	background: #0b1020;
 	color: #e9ecff;
 }
+
+/* ============================================================
+   Removed Friends — + button
+   ============================================================ */
+
+.addRemovedBtn{
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.addRemovedBtn:hover{
+  border-color: rgba(255,255,255,.22);
+  background: rgba(255,255,255,.10);
+}
+
+/* ============================================================
+   Popover overlay (modal)
+   ============================================================ */
+
+.popoverOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.popoverOverlay.open{
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.popoverCard{
+  width: min(440px, calc(100vw - 32px));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: 0 16px 48px rgba(0,0,0,.45);
+  transform: translateY(12px) scale(.97);
+  transition: transform 200ms ease, opacity 200ms ease;
+  opacity: 0;
+}
+
+.popoverOverlay.open .popoverCard{
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.popoverBody{
+  padding: 14px;
+}
+
+/* ============================================================
+   Removed friend preview card (inside popover)
+   ============================================================ */
+
+.removedPreviewCard{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0,0,0,.15);
+}
+
+.removedPreviewAvatar{
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.12);
+}
+
+.removedPreviewMeta{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}

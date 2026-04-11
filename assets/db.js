@@ -37,6 +37,9 @@ export function makeEmptyDb() {
 
 		friends: {}, // { [userId]: FriendRec }
 
+		// Removed friends: users who were once on the list but are no longer.
+		removedFriends: {}, // { [userId]: RemovedFriendRec }
+
 		// Cached "last known" friend list + thumbnails for instant load.
 		friendsCache: {
 			updatedAtMs: null,
@@ -56,6 +59,11 @@ export function loadDb() {
 	}
 
 	if (!("baselineCapturedMs" in db)) db.baselineCapturedMs = null
+
+	// Backfill removedFriends
+	if (!("removedFriends" in db) || !isObj(db.removedFriends)) {
+		db.removedFriends = {}
+	}
 
 	// Backfill cache structure
 	if (!("friendsCache" in db) || !isObj(db.friendsCache)) {
@@ -473,6 +481,51 @@ export function importTrackedData(db, payload, {
 
 	saveDb(db)
 	return { db, applied, skippedNotFriend, skippedBad, skippedProtected }
+}
+
+/**
+ * RemovedFriendRec:
+ * {
+ *		userId: number,
+ *		username: string,
+ *		displayName: string,
+ *		headshotUrl: string,
+ *		removedAtMs: number|null,   // when they were removed / unfriended
+ *		addedAtMs: number,          // when this entry was created in JFSC
+ * }
+ */
+
+export function addRemovedFriend(db, { userId, username, displayName, headshotUrl, removedAtMs }) {
+	const uid = Number(userId)
+	if (!Number.isFinite(uid) || uid <= 0) throw new Error("Invalid userId")
+
+	const key = String(uid)
+	const n = nowMs()
+
+	db.removedFriends[key] = {
+		userId: uid,
+		username: String(username || ""),
+		displayName: String(displayName || ""),
+		headshotUrl: String(headshotUrl || ""),
+		removedAtMs: (Number.isFinite(removedAtMs) && removedAtMs > 0) ? removedAtMs : null,
+		addedAtMs: n,
+	}
+
+	return saveDb(db)
+}
+
+export function deleteRemovedFriend(db, userId) {
+	const uid = Number(userId)
+	if (!Number.isFinite(uid) || uid <= 0) throw new Error("Invalid userId")
+	delete db.removedFriends[String(uid)]
+	return saveDb(db)
+}
+
+export function getRemovedFriends(db) {
+	if (!db || !isObj(db) || !isObj(db.removedFriends)) return []
+	return Object.values(db.removedFriends)
+		.filter((r) => isObj(r) && Number.isFinite(r.userId) && r.userId > 0)
+		.sort((a, b) => (b.addedAtMs || 0) - (a.addedAtMs || 0))
 }
 
 export function formatLocalDateTime(ms, {
